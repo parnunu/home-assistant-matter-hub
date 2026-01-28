@@ -1,50 +1,90 @@
-# Home-Assistant-Matter-Hub
+# Home Assistant Matter Hub (Fork)
 
-!["Home-Assistant-Matter-Hub"](./docs/assets/hamh-logo-small.png)
+![Home-Assistant-Matter-Hub](./docs/assets/hamh-logo-small.png)
 
 ---
 
 ## Fork notice
 
 This repository is a fork of `t0bst4r/home-assistant-matter-hub`.
-It is maintained by **parnunu**, and all development work is performed by AI only.
-
----
-
-> [!IMPORTANT]  
-> ⚠️ **Project Status: End of Maintenance**
->
-> As of **January 2026**, this project is no longer actively maintained.
->
-> I previously announced a search for a new maintainer, but unfortunately no one has stepped forward
-> to take over the project. Due to personal time constraints, I am no longer able to continue development or provide support.
->
-> **What this means:**
-> - ❌ No further feature development
-> - ❌ No bug fixes or updates
-> - ❌ No guaranteed support
->
-> The repository will remain available for reference and forking.
->
-> 💡 I would be very happy to see this project continued by the community.  
-> If you plan to fork it and continue development: **may the best fork prevail.**
->
-> Thank you to everyone who used, tested, and contributed to this project ❤️
-
+Maintained by **parnunu**. Development work is performed by AI only.
 
 ---
 
 ## About
 
-This project simulates bridges to publish your entities from Home Assistant to any Matter-compatible controller like
-Alexa, Apple Home or Google Home. Using Matter, those can be connected easily using local communication without the need
-of port forwarding etc.
+Home Assistant Matter Hub (HAMH) simulates Matter bridges that expose your Home Assistant entities to Matter controllers
+like Alexa, Apple Home, and Google Home. It uses local communication and does not require cloud or port forwarding.
+
+---
+
+## Project status
+
+Upstream announced end of maintenance in January 2026. This fork continues independently for experimentation and
+maintenance as needed.
+
+---
+
+## Installation (Home Assistant Add-on)
+
+The supported production install method is the Home Assistant add-on.
+
+1. In Home Assistant, go to Settings -> Add-ons -> Add-on Store.
+2. Add this add-ons repository URL:
+   - https://github.com/parnunu/home-assistant-addons
+3. Refresh the Add-on Store, then install Home Assistant Matter Hub.
+4. Configure as needed and click Start.
+
+For full details, see:
+- docs/Getting Started/Installation.md
 
 ---
 
 ## Documentation
 
-Please see the [documentation](https://t0bst4r.github.io/home-assistant-matter-hub) for installation instructions,
-known issues, limitations and guides.
+Start here for guides, limitations, and troubleshooting:
+
+- docs/Getting Started/Installation.md
+- docs/Getting Started/Bridge Configuration.md
+- docs/Developer Documentation/README.md
+- docs/Developer Documentation/local-dev.md
 
 ---
+
+## Home Assistant Add-on
+
+Production deployment remains the Home Assistant add-on.
+The add-on build files live in:
+
+- apps/home-assistant-matter-hub/addon.Dockerfile
+- apps/home-assistant-matter-hub/addon.docker-entrypoint.sh
+- apps/home-assistant-matter-hub/build.js
+
+---
+
+## Local development (PC)
+
+Requirements:
+- Node.js 22
+- pnpm 10.28.1
+
+Run backend:
+
+pnpm --filter @home-assistant-matter-hub/backend run serve
+
+Run frontend:
+
+pnpm --filter @home-assistant-matter-hub/frontend run dev
+
+---
+
+## Contributing
+
+This fork follows an evidence-first workflow and uses child issues + PRs per work item.
+See AGENTS.md for the exact rules.
+
+---
+
+## License
+
+See LICENSE.
