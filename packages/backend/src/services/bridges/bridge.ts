@@ -86,6 +86,12 @@ export class Bridge {
     code: BridgeStatus = BridgeStatus.Stopped,
     reason = "Manually stopped",
   ) {
+    if (
+      this.status.code === BridgeStatus.Stopped ||
+      this.status.code === BridgeStatus.Failed
+    ) {
+      return;
+    }
     this.endpointManager.stopObserving();
     await this.server.cancel();
     this.status = { code, reason };
