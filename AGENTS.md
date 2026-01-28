@@ -11,7 +11,9 @@
 - Close the child issue after the fix is pushed to `main`.
 
 ## GitHub Admin Workflow
-- Keep the fork synced with upstream before starting work.
+- Configure the upstream remote once, then sync the fork before each new work item if upstream has moved.
+- For this repo, upstream is `t0bst4r/home-assistant-matter-hub`.
+- Use `gh repo sync parnunu/home-assistant-matter-hub -b main` to refresh the fork when needed.
 - Do work on a branch per child issue.
 - Open a PR for each branch and link it to the child issue.
 - Close the child issue only after the PR is opened and pushed.
