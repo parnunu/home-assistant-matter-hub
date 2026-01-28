@@ -13,6 +13,7 @@ This documentation is intended for developers taking over or contributing to the
 - [Behaviors](./behaviors.md): How behaviors work, configuration, and extension.
 - [Service Management](./services.md): AppEnvironment, BridgeEnvironment, and service dependencies.
 - [Endpoint Management](./endpoints.md): How bridge endpoints are managed and updated.
+- [Local PC Development](./local-dev.md): Run locally while connecting to a remote Home Assistant instance.
 
 ---
 
