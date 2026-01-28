@@ -10,6 +10,12 @@
 - Create a child issue for each work item.
 - Close the child issue after the fix is pushed to `main`.
 
+## GitHub Admin Workflow
+- Use branches and PRs for every change.
+- Sync the fork with upstream (`t0bst4r/home-assistant-matter-hub`) before starting work.
+- Create issues for each work item and link them to PRs.
+- Merge PRs only after tests/checks pass (or document why skipped).
+
 ## Logging
 - Use persistent logs for debugging (do not rely on console only).
 - Keep logs under `${HAMH_STORAGE_LOCATION}/logs`.
