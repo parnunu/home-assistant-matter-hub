@@ -20,6 +20,14 @@ export const selectBridge = (bridgeId: string | undefined) =>
     return result;
   });
 
+export const selectBridgeDeleting = (bridgeId: string | undefined) =>
+  createAppSelector([selectBridgeState], (bridgeState) => {
+    if (!bridgeId) {
+      return false;
+    }
+    return bridgeState.deletingIds[bridgeId] ?? false;
+  });
+
 export const selectUsedPorts = createAppSelector([selectBridges], (bridges) => {
   if (!bridges.isInitialized) {
     return undefined;

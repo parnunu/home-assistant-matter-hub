@@ -13,6 +13,7 @@ import {
 import {
   selectBridge,
   selectBridges,
+  selectBridgeDeleting,
   selectUsedPorts,
 } from "../../state/bridges/bridge-selectors.ts";
 import { useAppDispatch, useAppSelector } from "../../state/hooks.ts";
@@ -28,6 +29,11 @@ export function useUsedPorts() {
 
 export function useBridge(bridgeId: string) {
   const selector = useMemo(() => selectBridge(bridgeId), [bridgeId]);
+  return useAppSelector(selector);
+}
+
+export function useBridgeDeleting(bridgeId: string) {
+  const selector = useMemo(() => selectBridgeDeleting(bridgeId), [bridgeId]);
   return useAppSelector(selector);
 }
 

@@ -9,6 +9,7 @@ import { Service } from "../../core/ioc/service.js";
 import type { BridgeStorage } from "../storage/bridge-storage.js";
 import type { Bridge } from "./bridge.js";
 import type { BridgeFactory } from "./bridge-factory.js";
+import { appendDebugLog } from "../../utils/logging/file-log.js";
 
 export interface BridgeServiceProps {
   basicInformation: BridgeBasicInformation;
@@ -82,11 +83,50 @@ export class BridgeService extends Service {
     if (!bridge) {
       return;
     }
-    await bridge.stop();
-    await bridge.delete();
-    await bridge.dispose();
-    this.bridges.splice(this.bridges.indexOf(bridge), 1);
-    await this.bridgeStorage.remove(bridgeId);
+    appendDebugLog("bridge-delete.log", [
+      `[BridgeService] Delete requested for bridge ${bridgeId}`,
+    ]);
+    try {
+      await bridge.stop();
+    } catch (e) {
+      // Keep going to ensure storage is updated even if stop fails.
+      console.error(`[BridgeService] Failed to stop bridge ${bridgeId}`, e);
+      appendDebugLog("bridge-delete.log", [
+        `[BridgeService] Failed to stop bridge ${bridgeId}: ${String(e)}`,
+      ]);
+    }
+    try {
+      await bridge.delete();
+    } catch (e) {
+      // Matter server delete can throw; don't crash the process.
+      console.error(`[BridgeService] Failed to delete bridge ${bridgeId}`, e);
+      appendDebugLog("bridge-delete.log", [
+        `[BridgeService] Failed to delete bridge ${bridgeId}: ${String(e)}`,
+      ]);
+    }
+    try {
+      await bridge.dispose();
+    } catch (e) {
+      console.error(`[BridgeService] Failed to dispose bridge ${bridgeId}`, e);
+      appendDebugLog("bridge-delete.log", [
+        `[BridgeService] Failed to dispose bridge ${bridgeId}: ${String(e)}`,
+      ]);
+    }
+    const index = this.bridges.indexOf(bridge);
+    if (index >= 0) {
+      this.bridges.splice(index, 1);
+    }
+    try {
+      await this.bridgeStorage.remove(bridgeId);
+    } catch (e) {
+      console.error(
+        `[BridgeService] Failed to remove bridge ${bridgeId} from storage`,
+        e,
+      );
+      appendDebugLog("bridge-delete.log", [
+        `[BridgeService] Failed to remove bridge ${bridgeId} from storage: ${String(e)}`,
+      ]);
+    }
   }
 
   private async addBridge(bridgeData: BridgeData): Promise<Bridge> {

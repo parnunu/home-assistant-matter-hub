@@ -31,9 +31,12 @@ export async function updateBridge(req: UpdateBridgeRequest) {
 }
 
 export async function deleteBridge(bridgeId: string) {
-  await fetch(`api/matter/bridges/${bridgeId}`, {
+  const res = await fetch(`api/matter/bridges/${bridgeId}`, {
     method: "DELETE",
   });
+  if (!res.ok) {
+    throw new Error(`Failed to delete bridge (${res.status})`);
+  }
 }
 
 export async function resetBridge(bridgeId: string) {

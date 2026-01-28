@@ -8,6 +8,7 @@ import { Ajv } from "ajv";
 import express from "express";
 import type { BridgeService } from "../services/bridges/bridge-service.js";
 import { endpointToJson } from "../utils/json/endpoint-to-json.js";
+import { appendDebugLog } from "../utils/logging/file-log.js";
 
 const ajv = new Ajv();
 
@@ -62,8 +63,16 @@ export function matterApi(bridgeService: BridgeService): express.Router {
 
   router.delete("/bridges/:bridgeId", async (req, res) => {
     const bridgeId = req.params.bridgeId;
-    await bridgeService.delete(bridgeId);
-    res.status(204).send();
+    try {
+      await bridgeService.delete(bridgeId);
+      res.status(204).send();
+    } catch (e) {
+      console.error(`[matter-api] Failed to delete bridge ${bridgeId}`, e);
+      appendDebugLog("bridge-delete.log", [
+        `[matter-api] Failed to delete bridge ${bridgeId}: ${String(e)}`,
+      ]);
+      res.status(500).send("Failed to delete bridge");
+    }
   });
 
   router.get("/bridges/:bridgeId/actions/factory-reset", async (req, res) => {
