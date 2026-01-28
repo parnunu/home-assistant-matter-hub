@@ -19,6 +19,7 @@ project:
     - title: Developer Documentation
       children:
         - file: "Developer Documentation/README.md"
+        - file: "Developer Documentation/local-dev.md"
         - file: "Developer Documentation/services.md"
         - file: "Developer Documentation/endpoints.md"
         - file: "Developer Documentation/behaviors.md"
