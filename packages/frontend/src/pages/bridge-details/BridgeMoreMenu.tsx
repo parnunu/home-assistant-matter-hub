@@ -11,7 +11,11 @@ import MenuItem from "@mui/material/MenuItem";
 import * as React from "react";
 import { Link as RouterLink, useNavigate } from "react-router";
 import { useNotifications } from "../../components/notifications/use-notifications.ts";
-import { useDeleteBridge, useResetBridge } from "../../hooks/data/bridges.ts";
+import {
+  useBridgeDeleting,
+  useDeleteBridge,
+  useResetBridge,
+} from "../../hooks/data/bridges.ts";
 import { navigation } from "../../routes.tsx";
 
 export interface BridgeMoreMenuProps {
@@ -27,6 +31,7 @@ export const BridgeMoreMenu = ({ bridge }: BridgeMoreMenuProps) => {
 
   const factoryReset = useResetBridge();
   const deleteBridge = useDeleteBridge();
+  const isDeleting = useBridgeDeleting(bridge);
 
   const handleOpen = (event: React.MouseEvent<HTMLElement>) =>
     setAnchorEl(event.currentTarget);
@@ -50,14 +55,18 @@ export const BridgeMoreMenu = ({ bridge }: BridgeMoreMenuProps) => {
   };
   const handleDelete = async () => {
     handleClose();
+    notification.show({
+      message: "Deleting bridge...",
+      severity: "info",
+    });
     await deleteBridge(bridge)
+      .then(() => navigate(navigation.bridges))
       .then(() =>
         notification.show({
           message: "Bridge deleted successfully",
           severity: "success",
         }),
       )
-      .then(() => navigate(navigation.bridges))
       .catch((reason) =>
         notification.show({
           message: `Failed to delete bridge: ${reason.toString()}`,
@@ -85,11 +94,11 @@ export const BridgeMoreMenu = ({ bridge }: BridgeMoreMenuProps) => {
           </ListItemIcon>
           <ListItemText>Factory Reset</ListItemText>
         </MenuItem>
-        <MenuItem onClick={handleDelete}>
+        <MenuItem onClick={handleDelete} disabled={isDeleting}>
           <ListItemIcon>
             <DeleteIcon fontSize="small" />
           </ListItemIcon>
-          <ListItemText>Delete</ListItemText>
+          <ListItemText>{isDeleting ? "Deleting..." : "Delete"}</ListItemText>
         </MenuItem>
       </Menu>
     </>

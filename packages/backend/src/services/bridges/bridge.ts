@@ -3,6 +3,9 @@ import {
   type UpdateBridgeRequest,
 } from "@home-assistant-matter-hub/common";
 import type { Environment, Logger } from "@matter/general";
+import { StorageService } from "@matter/main";
+import fs from "node:fs";
+import path from "node:path";
 import type { LoggerService } from "../../core/app/logger.js";
 import { BridgeServerNode } from "../../matter/endpoints/bridge-server-node.js";
 import type {
@@ -10,8 +13,10 @@ import type {
   BridgeServerStatus,
 } from "./bridge-data-provider.js";
 import type { BridgeEndpointManager } from "./bridge-endpoint-manager.js";
+import { appendDebugLog } from "../../utils/logging/file-log.js";
 
 export class Bridge {
+  private readonly env: Environment;
   private readonly log: Logger;
   readonly server: BridgeServerNode;
 
@@ -42,6 +47,7 @@ export class Bridge {
     private readonly dataProvider: BridgeDataProvider,
     private readonly endpointManager: BridgeEndpointManager,
   ) {
+    this.env = env;
     this.log = logger.get(`Bridge / ${dataProvider.id}`);
     this.server = new BridgeServerNode(
       env,
@@ -67,6 +73,7 @@ export class Bridge {
       return;
     }
     try {
+      this.endpointManager.setStopping(false);
       this.status = {
         code: BridgeStatus.Starting,
         reason: "The bridge is starting... Please wait.",
@@ -92,6 +99,8 @@ export class Bridge {
     ) {
       return;
     }
+    this.endpointManager.setStopping(true);
+    await this.endpointManager.waitForIdle();
     this.endpointManager.stopObserving();
     await this.server.cancel();
     this.status = { code, reason };
@@ -99,6 +108,7 @@ export class Bridge {
 
   async update(update: UpdateBridgeRequest) {
     try {
+      this.endpointManager.setStopping(false);
       this.dataProvider.update(update);
       await this.refreshDevices();
     } catch (e) {
@@ -118,6 +128,22 @@ export class Bridge {
   }
 
   async delete() {
-    await this.server.delete();
+    this.endpointManager.setStopping(true);
+    await this.endpointManager.waitForIdle();
+    try {
+      const storageService = this.env.get(StorageService);
+      if (storageService.location) {
+        const bridgeStoragePath = path.join(storageService.location, this.id);
+        fs.rmSync(bridgeStoragePath, { recursive: true, force: true });
+        appendDebugLog("bridge-delete.log", [
+          `[Bridge] Removed Matter storage at ${bridgeStoragePath}`,
+        ]);
+      }
+    } catch (e) {
+      appendDebugLog("bridge-delete.log", [
+        `[Bridge] Failed to remove Matter storage for ${this.id}: ${String(e)}`,
+      ]);
+      throw e;
+    }
   }
 }

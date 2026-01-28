@@ -10,6 +10,7 @@ import type { BridgeState } from "./bridge-state.ts";
 
 const initialState: BridgeState = {
   items: { isInitialized: false, isLoading: false },
+  deletingIds: {},
 };
 
 export const bridgesReducer = createReducer(initialState, (builder) => {
@@ -47,6 +48,7 @@ export const bridgesReducer = createReducer(initialState, (builder) => {
       }
     })
     .addCase(deleteBridge.fulfilled, (state, action) => {
+      delete state.deletingIds[action.meta.arg];
       if (state.items.content) {
         const idx = state.items.content.findIndex(
           (b) => b.id === action.meta.arg,
@@ -55,5 +57,11 @@ export const bridgesReducer = createReducer(initialState, (builder) => {
           state.items.content.splice(idx, 1);
         }
       }
+    })
+    .addCase(deleteBridge.pending, (state, action) => {
+      state.deletingIds[action.meta.arg] = true;
+    })
+    .addCase(deleteBridge.rejected, (state, action) => {
+      delete state.deletingIds[action.meta.arg];
     });
 });

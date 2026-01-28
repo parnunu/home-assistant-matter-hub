@@ -14,6 +14,8 @@ export class BridgeEndpointManager extends Service {
   readonly root: Endpoint;
   private entityIds: string[] = [];
   private unsubscribe?: () => void;
+  private isStopping = false;
+  private inFlight: Promise<void> | null = null;
 
   constructor(
     private readonly client: HomeAssistantClient,
@@ -31,6 +33,10 @@ export class BridgeEndpointManager extends Service {
   async startObserving() {
     this.stopObserving();
 
+    if (this.isStopping) {
+      return;
+    }
+
     if (!this.entityIds.length) {
       return;
     }
@@ -47,55 +53,106 @@ export class BridgeEndpointManager extends Service {
     this.unsubscribe = undefined;
   }
 
-  async refreshDevices() {
-    this.registry.refresh();
-
-    const endpoints = this.root.parts.map((p) => p as EntityEndpoint);
-    this.entityIds = this.registry.entityIds;
-
-    const existingEndpoints: EntityEndpoint[] = [];
-    for (const endpoint of endpoints) {
-      if (!this.entityIds.includes(endpoint.entityId)) {
-        await endpoint.delete();
-      } else {
-        existingEndpoints.push(endpoint);
-      }
-    }
-
-    for (const entityId of this.entityIds) {
-      let endpoint = existingEndpoints.find((e) => e.entityId === entityId);
-      if (!endpoint) {
-        try {
-          endpoint = await LegacyEndpoint.create(this.registry, entityId);
-        } catch (e) {
-          if (e instanceof InvalidDeviceError) {
-            this.log.warn(
-              `Invalid device detected. Entity: ${entityId} Reason: ${(e as Error).message}`,
-            );
-            continue;
-          } else {
-            this.log.error(
-              `Failed to create device ${entityId}. Error: ${e?.toString()}`,
-            );
-            throw e;
-          }
-        }
-
-        if (endpoint) {
-          await this.root.add(endpoint);
-        }
-      }
-    }
-
-    if (this.unsubscribe) {
-      this.startObserving();
+  setStopping(isStopping: boolean) {
+    this.isStopping = isStopping;
+    if (isStopping) {
+      this.stopObserving();
     }
   }
 
-  async updateStates(states: HomeAssistantStates) {
-    const endpoints = this.root.parts.map((p) => p as EntityEndpoint);
-    for (const endpoint of endpoints) {
-      await endpoint.updateStates(states);
+  private async runExclusive(task: () => Promise<void>) {
+    if (this.inFlight) {
+      await this.inFlight;
     }
+    this.inFlight = (async () => {
+      await task();
+    })();
+    try {
+      await this.inFlight;
+    } finally {
+      if (this.inFlight) {
+        this.inFlight = null;
+      }
+    }
+  }
+
+  async waitForIdle() {
+    if (this.inFlight) {
+      await this.inFlight;
+    }
+  }
+
+  async refreshDevices() {
+    if (this.isStopping) {
+      return;
+    }
+    await this.runExclusive(async () => {
+      if (this.isStopping) {
+        return;
+      }
+      this.registry.refresh();
+
+      const endpoints = this.root.parts.map((p) => p as EntityEndpoint);
+      this.entityIds = this.registry.entityIds;
+
+      const existingEndpoints: EntityEndpoint[] = [];
+      for (const endpoint of endpoints) {
+        if (!this.entityIds.includes(endpoint.entityId)) {
+          await endpoint.delete();
+        } else {
+          existingEndpoints.push(endpoint);
+        }
+      }
+
+      for (const entityId of this.entityIds) {
+        if (this.isStopping) {
+          break;
+        }
+        let endpoint = existingEndpoints.find((e) => e.entityId === entityId);
+        if (!endpoint) {
+          try {
+            endpoint = await LegacyEndpoint.create(this.registry, entityId);
+          } catch (e) {
+            if (e instanceof InvalidDeviceError) {
+              this.log.warn(
+                `Invalid device detected. Entity: ${entityId} Reason: ${(e as Error).message}`,
+              );
+              continue;
+            } else {
+              this.log.error(
+                `Failed to create device ${entityId}. Error: ${e?.toString()}`,
+              );
+              throw e;
+            }
+          }
+
+          if (endpoint && !this.isStopping) {
+            await this.root.add(endpoint);
+          }
+        }
+      }
+
+      if (this.unsubscribe) {
+        this.startObserving();
+      }
+    });
+  }
+
+  async updateStates(states: HomeAssistantStates) {
+    if (this.isStopping) {
+      return;
+    }
+    await this.runExclusive(async () => {
+      if (this.isStopping) {
+        return;
+      }
+      const endpoints = this.root.parts.map((p) => p as EntityEndpoint);
+      for (const endpoint of endpoints) {
+        if (this.isStopping) {
+          break;
+        }
+        await endpoint.updateStates(states);
+      }
+    });
   }
 }
