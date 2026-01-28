@@ -4,6 +4,13 @@
 
 ---
 
+## Fork notice
+
+This repository is a fork of `t0bst4r/home-assistant-matter-hub`.
+It is maintained by **parnunu**, and all development work is performed by AI only.
+
+---
+
 > [!IMPORTANT]  
 > ⚠️ **Project Status: End of Maintenance**
 >
