@@ -3,7 +3,7 @@ use std::sync::Arc;
 use axum::{
     extract::{Path, State},
     http::StatusCode,
-    routing::{delete, get, post, put},
+    routing::{get, post},
     Json, Router,
 };
 use hamh_core::models::{BridgeConfig, BridgeOperation, OperationType};

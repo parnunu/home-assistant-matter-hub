@@ -59,14 +59,12 @@ async fn main() {
                     tracing::warn!("Failed to mark op running: {err}");
                 }
 
-                let result = match op.op_type {
-                    OperationType::Start => {
-                        match runner_storage.get_bridge(op.bridge_id) {
-                            Ok(Some(bridge)) => runner_matter.start_bridge(&bridge).await,
-                            Ok(None) => Err(hamh_matter::MatterError::NotImplemented),
-                            Err(_) => Err(hamh_matter::MatterError::NotImplemented),
-                        }
-                    }
+                let result: Result<(), hamh_matter::MatterError> = match op.op_type {
+                    OperationType::Start => match runner_storage.get_bridge(op.bridge_id) {
+                        Ok(Some(bridge)) => runner_matter.start_bridge(&bridge).await.map(|_| ()),
+                        Ok(None) => Err(hamh_matter::MatterError::NotImplemented),
+                        Err(_) => Err(hamh_matter::MatterError::NotImplemented),
+                    },
                     _ => Ok(()),
                 };
 

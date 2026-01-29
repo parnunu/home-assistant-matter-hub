@@ -1,6 +1,6 @@
 use std::fs;
 use std::io::Write;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use hamh_core::models::{BridgeConfig, BridgeOperation, OperationStatus};
 use serde::{Deserialize, Serialize};
@@ -31,7 +31,7 @@ impl FileStorage {
         Self { root: root.into() }
     }
 
-    pub fn load(&self) -> Result<StorageState, StorageError> {
+    fn load(&self) -> Result<StorageState, StorageError> {
         let path = self.root.join("storage.json");
         if !path.exists() {
             return Ok(StorageState {
@@ -43,7 +43,7 @@ impl FileStorage {
         Ok(serde_json::from_str(&data)?)
     }
 
-    pub fn save(&self, state: &StorageState) -> Result<(), StorageError> {
+    fn save(&self, state: &StorageState) -> Result<(), StorageError> {
         fs::create_dir_all(&self.root)?;
         let tmp_path = self.root.join("storage.json.tmp");
         let final_path = self.root.join("storage.json");
