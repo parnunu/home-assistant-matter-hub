@@ -1,4 +1,4 @@
-# Design Spec — HAMH vNext (Configurable Matter Bridge)
+# Design Spec - HAMH vNext (Configurable Matter Bridge)
 
 ## 1) Goals
 - Provide a robust Matter bridge that exposes Home Assistant entities to Matter controllers.
@@ -7,127 +7,127 @@
 - Keep add-on installation and Supervisor integration fully functional.
 - Improve observability: persistent logs, diagnostics, and clear error states.
 
-## 2) Non‑Goals
+## 2) Non-Goals
 - No reliance on cloud services or external skills.
 - No requirement to keep backward compatibility with existing UI/CLI behavior if it reduces robustness.
 - Not aiming to be a general Matter controller (bridge only).
 
 ## 3) Key Requirements
-- **Configurable Bridges**: Each bridge has its own config, filters, and status.
-- **Independent Lifecycle**: Create/Start/Stop/Refresh/Delete is isolated per bridge.
-- **Stable Deletion**: Delete never crashes backend; always idempotent.
-- **Home Assistant Add‑on**: Uses Supervisor token and ingress; runs in container.
-- **Local Dev**: PC mode for dev connected to remote HA.
-- **Operations Queue**: Persisted lifecycle operations with retries and clear status.
-- **Admin UI Logs**: Provide in‑app log downloads for persistent log files.
+- Configurable Bridges: Each bridge has its own config, filters, and status.
+- Independent Lifecycle: Create/Start/Stop/Refresh/Delete is isolated per bridge.
+- Stable Deletion: Delete never crashes backend; always idempotent.
+- Home Assistant Add-on: Uses Supervisor token and ingress; runs in container.
+- Local Dev: PC mode for dev connected to remote HA.
+- Operations Queue: Persisted lifecycle operations with retries and clear status.
+- Admin UI Logs: Provide in-app log downloads for persistent log files.
 
-## 4) High‑Level Architecture
-- **API Layer** (Express or Fastify)
-  - `/api/matter/...` endpoints for bridges and devices.
-  - No legacy alias `/api/bridges` (enforced prefix).
-- **Core Bridge Engine**
+## 4) High-Level Architecture
+- API Layer (Express or Fastify)
+  - /api/matter/... endpoints for bridges and devices.
+  - No legacy alias /api/bridges (enforced prefix).
+- Core Bridge Engine
   - BridgeService: lifecycle orchestration.
-  - BridgeRuntime: per‑bridge runtime with Matter node, endpoints, and registries.
+  - BridgeRuntime: per-bridge runtime with Matter node, endpoints, and registries.
   - BridgeStorage: persists config and runtime metadata.
-- **Integrations**
+- Integrations
   - HomeAssistantClient: websocket for state and services.
   - EntityMapper: maps HA entities to Matter device types.
-- **Frontend**
-  - Single‑page UI for bridge list/details/create/edit and device status.
+- Frontend
+  - Single-page UI for bridge list/details/create/edit and device status.
 
 ## 5) Data Model
 ### BridgeConfig
-- `id`, `name`, `port`, `filter`, `featureFlags`, `commissioning`, `createdAt`, `updatedAt`
+- id, name, port, filter, featureFlags, commissioning, createdAt, updatedAt
 
 ### BridgeFilter
-- `include`: array of `{ type: "domain" | "entity_id" | "area" | "label" | "device_id", value }`
-- `exclude`: same schema
+- include: array of { type: domain | entity_id | area | label | device_id, value }
+- exclude: same schema
 
 ### BridgeRuntimeState
-- `status`: `stopped | starting | running | stopping | deleting | error | queued`
-- `lastError`, `lastStart`, `lastStop`, `operationId`
+- status: stopped | starting | running | stopping | deleting | error | queued
+- lastError, lastStart, lastStop, operationId
 
 ### BridgeOperation
-- `operationId`, `bridgeId`, `type`, `status`, `queuedAt`, `startedAt`, `finishedAt`, `error`
-- `type`: `create | start | stop | refresh | delete | factory-reset | update`
-- `status`: `queued | running | completed | failed | cancelled`
+- operationId, bridgeId, type, status, queuedAt, startedAt, finishedAt, error
+- type: create | start | stop | refresh | delete | factory-reset | update
+- status: queued | running | completed | failed | cancelled
 
 ### BridgeDevice
-- `entity_id`, `device_type`, `endpoint_id`, `capabilities`, `reachable`
+- entity_id, device_type, endpoint_id, capabilities, reachable
 
 ## 6) REST API (v1)
-Base: `/api/matter`
+Base: /api/matter
 
-- `GET /bridges` → list bridges
-- `POST /bridges` → create bridge
-- `GET /bridges/:id` → bridge details
-- `PUT /bridges/:id` → update bridge
-- `DELETE /bridges/:id` → delete bridge
-- `POST /bridges/:id/actions/start` → start
-- `POST /bridges/:id/actions/stop` → stop
-- `POST /bridges/:id/actions/refresh` → refresh endpoints
-- `POST /bridges/:id/actions/factory-reset` → factory reset
-- `GET /bridges/:id/devices` → list devices for a bridge
-- `GET /operations` → list operations (latest first)
-- `GET /operations/:id` → operation details
-- `GET /health` → health + build info
+- GET /bridges -> list bridges
+- POST /bridges -> create bridge
+- GET /bridges/:id -> bridge details
+- PUT /bridges/:id -> update bridge
+- DELETE /bridges/:id -> delete bridge
+- POST /bridges/:id/actions/start -> start
+- POST /bridges/:id/actions/stop -> stop
+- POST /bridges/:id/actions/refresh -> refresh endpoints
+- POST /bridges/:id/actions/factory-reset -> factory reset
+- GET /bridges/:id/devices -> list devices for a bridge
+- GET /operations -> list operations (latest first)
+- GET /operations/:id -> operation details
+- GET /health -> health + build info
 
 ### API Behavior Rules
-- Deletion is **idempotent**: deleting a missing bridge returns `204`.
-- Mutating operations return `202` with `operationId` when queued/async.
-- Consistent JSON errors: `{ code, message, details }`.
+- Deletion is idempotent: deleting a missing bridge returns 204.
+- Mutating operations return 202 with operationId when queued/async.
+- Consistent JSON errors: { code, message, details }.
 
 ## 7) Bridge Lifecycle
 ### Create
-- Validate config → persist → create runtime entry.
+- Validate config -> persist -> create runtime entry.
 
 ### Start
-- Acquire bridge lock → build Matter node + aggregator → subscribe to HA entities → ready.
+- Acquire bridge lock -> build Matter node + aggregator -> subscribe to HA entities -> ready.
 
 ### Refresh
-- Diff HA registry → update endpoints with minimal rebuild.
+- Diff HA registry -> update endpoints with minimal rebuild.
 
 ### Stop
-- Graceful stop: unsubscribe HA → stop Matter node → mark stopped.
+- Graceful stop: unsubscribe HA -> stop Matter node -> mark stopped.
 
 ### Delete
-- Mark `deleting` → stop → remove storage → remove runtime entry.
+- Mark deleting -> stop -> remove storage -> remove runtime entry.
 - Never crash on missing storage; return success.
 
-## 8) Concurrency & Robustness
-- Per‑bridge mutex (async lock) so only one lifecycle action runs at once.
-- **Operations queue** persists lifecycle actions to storage.
+## 8) Concurrency and Robustness
+- Per-bridge mutex (async lock) so only one lifecycle action runs at once.
+- Operations queue persists lifecycle actions to storage.
 - On crash/restart, incomplete operations resume or roll back safely.
-- System‑wide shutdown stops bridges in parallel with timeout and error aggregation.
+- System-wide shutdown stops bridges in parallel with timeout and error aggregation.
 
 ## 9) Endpoint Mapping
 - Mapping table from HA domains to Matter devices:
-  - `light` → `DimmableLight` / `ColorTemperatureLight` / `ExtendedColorLight`
-  - `switch` → `OnOffSwitch`
-  - `fan`, `cover`, `sensor`, etc. as defined in mapping spec
+  - light -> DimmableLight / ColorTemperatureLight / ExtendedColorLight
+  - switch -> OnOffSwitch
+  - fan, cover, sensor, etc. as defined in mapping spec
 - Behaviors:
-  - `HomeAssistantEntityBehavior` adapter for HA state/actions
+  - HomeAssistantEntityBehavior adapter for HA state/actions
   - Cluster behaviors aligned with Matter spec
-- **Sync policy**
+- Sync policy
   - Initial full sync on start
   - Incremental updates on HA state changes
   - Periodic full reconciliation every N minutes
 
 ## 10) Frontend UX
-- Bridge list with status badges: `running`, `stopped`, `deleting`, `error`, `queued`.
+- Bridge list with status badges: running, stopped, deleting, error, queued.
 - Delete flows:
-  - Shows “Deleting…” and disables actions.
+  - Shows Deleting... and disables actions.
   - Polls operation state; shows error if failed.
 - Detailed view:
   - Commissioning info, bridge settings, mapped entities summary.
 - Operations view:
   - Recent operations with status and timestamps.
 
-## 11) Observability & Logs
-- Persistent logs under `${HAMH_STORAGE_LOCATION}/logs`:
-  - `backend.log`
-  - `bridge-delete.log`
-  - `backend-crash.log`
+## 11) Observability and Logs
+- Persistent logs under ${HAMH_STORAGE_LOCATION}/logs:
+  - backend.log
+  - bridge-delete.log
+  - backend-crash.log
 - Structured logging (JSON optional).
 - Correlation ID for API requests.
 - Health endpoint with version and uptime.
@@ -136,22 +136,22 @@ Base: `/api/matter`
 - Provide a small admin page with:
   - Download links for persistent log files.
   - Basic metadata (size, last modified).
-- **Rationale**: Supervisor add‑on logs show console output, but not always file‑based
-  logs in storage. In‑app downloads make support easier without SSH.
+- Rationale: Supervisor add-on logs show console output, but not always file-based
+  logs in storage. In-app downloads make support easier without SSH.
 
-## 13) Home Assistant Add‑on Integration
-- Add‑on runs with `host_network` for mDNS.
+## 13) Home Assistant Add-on Integration
+- Add-on runs with host_network for mDNS.
 - Uses Supervisor token by default.
 - Supports ingress by default.
-- Add‑on config options:
-  - `app_log_level`, `mdns_interface`, `disable_log_colors`
-- Add‑ons repo points to `ghcr.io/parnunu/home-assistant-matter-hub-addon`.
+- Add-on config options:
+  - app_log_level, mdns_interface, disable_log_colors
+- Add-ons repo points to ghcr.io/parnunu/home-assistant-matter-hub-addon.
 
 ## 14) Local PC Mode
-- `pnpm run dev:pc` for backend + frontend
-- Backend listens on `8482`, frontend on `5173`
-- `.env` supports remote HA URL/token
-- Local storage defaults to `~/.hamh-development`
+- pnpm run dev:pc for backend + frontend
+- Backend listens on 8482, frontend on 5173
+- .env supports remote HA URL/token
+- Local storage defaults to ~/.hamh-development
 
 ## 15) Testing Strategy
 - Unit tests: entity mapping, API handlers, storage logic
@@ -164,6 +164,42 @@ Base: `/api/matter`
 - If migration fails, keep backup and start empty.
 
 ## 17) Open Questions (Resolved)
-- Legacy API alias `/api/bridges`? **No**.
-- Persisted operations queue? **Yes**.
-- Admin UI log downloads? **Yes** (Supervisor logs do not cover file logs).
+- Legacy API alias /api/bridges? No.
+- Persisted operations queue? Yes.
+- Admin UI log downloads? Yes (Supervisor logs do not cover file logs).
+
+## 18) Implementation Details (Added)
+### Operations Queue (Persistence + Semantics)
+- Storage: operations.json per app (or per bridge) with append-only entries.
+- Idempotency: operations include operationId and requestHash to dedupe.
+- Retries: exponential backoff (e.g., 1s, 5s, 15s, 60s) up to N attempts.
+- Cancellation: delete/stop can cancel queued start/refresh operations.
+- Resumption: on startup, resume queued/running operations in order.
+
+### Storage and Migration
+- Versioned storage: storageVersion in root config.
+- Rollback: store backup/ snapshots before migration.
+- Validation: schema validation before/after migration.
+
+### Security and Auth
+- Ingress: always enabled; only allows Supervisor-authenticated requests.
+- Basic Auth: optional for non-ingress usage.
+- IP allowlist: optional for local networks.
+- Token Handling: never log tokens; redact on error.
+
+### Add-on Config Schema (Supervisor)
+- app_log_level: list(silly|debug|info|notice|warn|error|fatal)
+- disable_log_colors: bool
+- mdns_network_interface: str?
+- home_assistant_url: str? (optional override)
+- home_assistant_access_token: str? (optional override)
+
+### Performance Targets
+- Bridges: up to 10 bridges.
+- Entities: up to 3,000 entities across bridges.
+- Refresh: entity update latency under 1s for single entity changes.
+
+### UI Error/Empty States
+- Empty bridge list message with CTA to create.
+- Error banner for API failures with retry action.
+- Deleting state persists on reload until operation completes.
