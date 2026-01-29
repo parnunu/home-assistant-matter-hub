@@ -1,67 +1,35 @@
 # Home Assistant Matter Hub vNext (Rework)
 
-![Home-Assistant-Matter-Hub](./docs/assets/hamh-logo-small.png)
+This is a from-scratch Rust rewrite of Home Assistant Matter Hub.
 
-## What this is
-Home Assistant Matter Hub (HAMH) is a Matter bridge for Home Assistant. It exposes selected Home Assistant entities to
-Matter controllers like Apple Home, Google Home, and Alexa using local networking (no cloud, no port forwarding).
-
-## Project status
-- Active development is on the `Rework` branch.
-- `main` is considered stable and may lag behind `Rework`.
+## Status
+- Active development happens on the `Rework` branch.
+- `main` remains stable and may lag behind.
 
 ## Installation (Home Assistant Add-on)
-Production deployment is the Home Assistant add-on.
+Production deployment is via the Home Assistant add-on:
 
-1. In Home Assistant: Settings -> Add-ons -> Add-on Store.
-2. Add this add-ons repository URL:
+1. Settings -> Add-ons -> Add-on Store
+2. Add this repository:
    - https://github.com/parnunu/home-assistant-addons
-3. Refresh the Add-on Store and install **Home Assistant Matter Hub**.
-4. Configure as needed and click Start.
+3. Install **Home Assistant Matter Hub** and start it
 
-## Local development (PC)
+## Local development
 Requirements:
-- Node.js 22
-- pnpm 10.28.1
+- Rust (stable toolchain)
+- Node.js 22 only if you still use the legacy frontend (not used for Rework)
 
-Create a `.env` at repo root (see `.env.sample`) and set your Home Assistant URL and token.
+Create `.env` at repo root (see `.env.sample`) and set your Home Assistant URL and token.
 
-Run backend:
+Run API server:
 ```
-pnpm --filter @home-assistant-matter-hub/backend run serve
-```
-
-Run frontend:
-```
-pnpm --filter @home-assistant-matter-hub/frontend run dev
+cargo run -p hamh-app
 ```
 
-Run both:
-```
-pnpm run dev:pc
-```
-
-Backend API: http://localhost:8482
-Frontend UI: http://localhost:5173
-
-## API
-API base: `/api/matter`
-
-## Logs
-Persistent logs are stored under `${HAMH_STORAGE_LOCATION}/logs`:
-- `backend.log`
-- `bridge-delete.log`
-- `backend-crash.log`
+API base: `http://localhost:8482/api/matter`
 
 ## Design spec
-The vNext design spec for the Rework branch is here:
-- `docs/Design-Spec-vNext.md`
-
-## Documentation
-- `docs/Getting Started/Installation.md`
-- `docs/Getting Started/Bridge Configuration.md`
-- `docs/Developer Documentation/README.md`
-- `docs/Developer Documentation/local-dev.md`
+See `docs/Design-Spec-vNext.md`.
 
 ## License
-See `LICENSE`.
+Apache-2.0. See `LICENSE`.

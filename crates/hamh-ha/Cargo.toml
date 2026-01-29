@@ -1,0 +1,11 @@
+[package]
+name = "hamh-ha"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+
+[dependencies]
+tracing = { workspace = true }
+thiserror = { workspace = true }
+
+# Planned: hass-rs for Home Assistant websocket integration.

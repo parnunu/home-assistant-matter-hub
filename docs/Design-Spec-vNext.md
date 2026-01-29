@@ -1,4 +1,4 @@
-# Design Spec - HAMH vNext (Configurable Matter Bridge)
+# Design Spec - HAMH vNext (Rust Rework)
 
 ## 1) Goals
 - Provide a robust Matter bridge that exposes Home Assistant entities to Matter controllers.
@@ -21,8 +21,14 @@
 - Operations Queue: Persisted lifecycle operations with retries and clear status.
 - Admin UI Logs: Provide in-app log downloads for persistent log files.
 
-## 4) High-Level Architecture
-- API Layer (Express or Fastify)
+## 4) Technology Choices (Rust)
+- Matter stack: rs-matter (Rust Matter implementation).
+- Home Assistant websocket: hass-rs (Rust HA websocket client).
+- HTTP API: Axum + Tokio.
+- Storage: file-based JSON with atomic write (storage.json + operations.json).
+
+## 5) High-Level Architecture
+- API Layer (Axum)
   - /api/matter/... endpoints for bridges and devices.
   - No legacy alias /api/bridges (enforced prefix).
 - Core Bridge Engine
@@ -33,9 +39,9 @@
   - HomeAssistantClient: websocket for state and services.
   - EntityMapper: maps HA entities to Matter device types.
 - Frontend
-  - Single-page UI for bridge list/details/create/edit and device status.
+  - Rust-first UI (served by the API). Start with minimal admin UI and expand.
 
-## 5) Data Model
+## 6) Data Model
 ### BridgeConfig
 - id, name, port, filter, featureFlags, commissioning, createdAt, updatedAt
 
@@ -55,7 +61,7 @@
 ### BridgeDevice
 - entity_id, device_type, endpoint_id, capabilities, reachable
 
-## 6) REST API (v1)
+## 7) REST API (v1)
 Base: /api/matter
 
 - GET /bridges -> list bridges
@@ -77,7 +83,7 @@ Base: /api/matter
 - Mutating operations return 202 with operationId when queued/async.
 - Consistent JSON errors: { code, message, details }.
 
-## 7) Bridge Lifecycle
+## 8) Bridge Lifecycle
 ### Create
 - Validate config -> persist -> create runtime entry.
 
@@ -94,13 +100,13 @@ Base: /api/matter
 - Mark deleting -> stop -> remove storage -> remove runtime entry.
 - Never crash on missing storage; return success.
 
-## 8) Concurrency and Robustness
+## 9) Concurrency and Robustness
 - Per-bridge mutex (async lock) so only one lifecycle action runs at once.
 - Operations queue persists lifecycle actions to storage.
 - On crash/restart, incomplete operations resume or roll back safely.
 - System-wide shutdown stops bridges in parallel with timeout and error aggregation.
 
-## 9) Endpoint Mapping
+## 10) Endpoint Mapping
 - Mapping table from HA domains to Matter devices:
   - light -> DimmableLight / ColorTemperatureLight / ExtendedColorLight
   - switch -> OnOffSwitch
@@ -113,7 +119,7 @@ Base: /api/matter
   - Incremental updates on HA state changes
   - Periodic full reconciliation every N minutes
 
-## 10) Frontend UX
+## 11) Frontend UX
 - Bridge list with status badges: running, stopped, deleting, error, queued.
 - Delete flows:
   - Shows Deleting... and disables actions.
@@ -123,7 +129,7 @@ Base: /api/matter
 - Operations view:
   - Recent operations with status and timestamps.
 
-## 11) Observability and Logs
+## 12) Observability and Logs
 - Persistent logs under ${HAMH_STORAGE_LOCATION}/logs:
   - backend.log
   - bridge-delete.log
@@ -132,14 +138,14 @@ Base: /api/matter
 - Correlation ID for API requests.
 - Health endpoint with version and uptime.
 
-## 12) Admin UI: Log Downloads
+## 13) Admin UI: Log Downloads
 - Provide a small admin page with:
   - Download links for persistent log files.
   - Basic metadata (size, last modified).
 - Rationale: Supervisor add-on logs show console output, but not always file-based
   logs in storage. In-app downloads make support easier without SSH.
 
-## 13) Home Assistant Add-on Integration
+## 14) Home Assistant Add-on Integration
 - Add-on runs with host_network for mDNS.
 - Uses Supervisor token by default.
 - Supports ingress by default.
@@ -147,28 +153,23 @@ Base: /api/matter
   - app_log_level, mdns_interface, disable_log_colors
 - Add-ons repo points to ghcr.io/parnunu/home-assistant-matter-hub-addon.
 
-## 14) Local PC Mode
-- pnpm run dev:pc for backend + frontend
-- Backend listens on 8482, frontend on 5173
+## 15) Local PC Mode
+- cargo run -p hamh-app
+- Backend listens on 8482
 - .env supports remote HA URL/token
 - Local storage defaults to ~/.hamh-development
 
-## 15) Testing Strategy
+## 16) Testing Strategy
 - Unit tests: entity mapping, API handlers, storage logic
 - Integration tests: fake HA websocket, refresh/diff behavior
 - E2E: create/start/delete bridge and verify stability
 
-## 16) Migration Plan
+## 17) Migration Plan
 - Detect existing storage format from main branch.
 - Migrate configs to new schema.
 - If migration fails, keep backup and start empty.
 
-## 17) Open Questions (Resolved)
-- Legacy API alias /api/bridges? No.
-- Persisted operations queue? Yes.
-- Admin UI log downloads? Yes (Supervisor logs do not cover file logs).
-
-## 18) Implementation Details (Added)
+## 18) Implementation Details
 ### Operations Queue (Persistence + Semantics)
 - Storage: operations.json per app (or per bridge) with append-only entries.
 - Idempotency: operations include operationId and requestHash to dedupe.

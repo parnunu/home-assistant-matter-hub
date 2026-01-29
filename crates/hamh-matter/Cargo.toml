@@ -1,0 +1,11 @@
+[package]
+name = "hamh-matter"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+
+[dependencies]
+tracing = { workspace = true }
+thiserror = { workspace = true }
+
+# Planned: rs-matter for Matter bridge implementation.
