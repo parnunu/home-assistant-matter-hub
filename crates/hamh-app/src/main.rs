@@ -41,9 +41,18 @@ async fn main() {
     let runner_matter = matter_adapter.clone();
     let _ = tokio::spawn(async move {
         let mut handles: HashMap<uuid::Uuid, hamh_matter::MatterBridgeHandle> = HashMap::new();
+        let mut ha_logged = false;
         loop {
             if let Err(err) = runner_ha.connect().await {
-                tracing::debug!("HA connect not implemented: {err}");
+                tracing::debug!("HA connect failed: {err}");
+            } else if !ha_logged {
+                match runner_ha.list_entities().await {
+                    Ok(entities) => {
+                        tracing::info!("Home Assistant reachable. Entities: {}", entities.len());
+                        ha_logged = true;
+                    }
+                    Err(err) => tracing::debug!("HA list_entities failed: {err}"),
+                }
             }
 
             let next_op = match runner_storage.next_queued_operation() {
