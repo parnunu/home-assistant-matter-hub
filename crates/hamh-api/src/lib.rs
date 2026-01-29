@@ -28,6 +28,10 @@ pub fn build_router(storage: FileStorage) -> Router {
             "/api/matter/bridges/:id",
             get(get_bridge).put(update_bridge).delete(delete_bridge),
         )
+        .route(
+            "/api/matter/bridges/:id/actions/start",
+            post(start_bridge),
+        )
         .route("/api/matter/operations", get(list_operations))
         .route("/api/matter/health", get(health))
         .with_state(state)
@@ -92,6 +96,14 @@ async fn delete_bridge(
 ) -> Result<StatusCode, ApiError> {
     let _ = state.ops.enqueue(id, OperationType::Delete)?;
     Ok(StatusCode::NO_CONTENT)
+}
+
+async fn start_bridge(
+    Path(id): Path<Uuid>,
+    State(state): State<Arc<AppState>>,
+) -> Result<StatusCode, ApiError> {
+    let _ = state.ops.enqueue(id, OperationType::Start)?;
+    Ok(StatusCode::ACCEPTED)
 }
 
 #[derive(Debug)]

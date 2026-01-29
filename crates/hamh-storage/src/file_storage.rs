@@ -2,9 +2,10 @@ use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
-use hamh-core::models::{BridgeConfig, BridgeOperation};
+use hamh-core::models::{BridgeConfig, BridgeOperation, OperationStatus};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
+use uuid::Uuid;
 
 #[derive(Debug, Error)]
 pub enum StorageError {
@@ -58,8 +59,20 @@ impl FileStorage {
         Ok(self.load()?.bridges)
     }
 
+    pub fn get_bridge(&self, id: Uuid) -> Result<Option<BridgeConfig>, StorageError> {
+        Ok(self.load()?.bridges.into_iter().find(|b| b.id == id))
+    }
+
     pub fn list_operations(&self) -> Result<Vec<BridgeOperation>, StorageError> {
         Ok(self.load()?.operations)
+    }
+
+    pub fn next_queued_operation(&self) -> Result<Option<BridgeOperation>, StorageError> {
+        let state = self.load()?;
+        Ok(state
+            .operations
+            .into_iter()
+            .find(|op| op.status == OperationStatus::Queued))
     }
 
     pub fn upsert_bridge(&self, bridge: BridgeConfig) -> Result<(), StorageError> {
@@ -71,6 +84,13 @@ impl FileStorage {
 
     pub fn add_operation(&self, op: BridgeOperation) -> Result<(), StorageError> {
         let mut state = self.load()?;
+        state.operations.insert(0, op);
+        self.save(&state)
+    }
+
+    pub fn update_operation(&self, op: BridgeOperation) -> Result<(), StorageError> {
+        let mut state = self.load()?;
+        state.operations.retain(|existing| existing.operation_id != op.operation_id);
         state.operations.insert(0, op);
         self.save(&state)
     }

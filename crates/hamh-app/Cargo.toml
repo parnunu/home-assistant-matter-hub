@@ -12,3 +12,7 @@ tracing-subscriber = { workspace = true }
 
 hamh-api = { path = "../hamh-api" }
 hamh-storage = { path = "../hamh-storage" }
+hamh-ha = { path = "../hamh-ha" }
+hamh-matter = { path = "../hamh-matter" }
+hamh-core = { path = "../hamh-core" }
+time = { workspace = true }
