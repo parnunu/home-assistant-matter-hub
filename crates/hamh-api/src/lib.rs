@@ -6,7 +6,7 @@ use axum::{
     routing::{delete, get, post, put},
     Json, Router,
 };
-use hamh-core::models::{BridgeConfig, BridgeOperation, OperationType};
+use hamh_core::models::{BridgeConfig, BridgeOperation, OperationType};
 use hamh_ops::OperationQueue;
 use hamh_storage::{FileStorage, StorageError};
 use time::OffsetDateTime;

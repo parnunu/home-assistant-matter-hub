@@ -2,7 +2,7 @@ use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 
-use hamh-core::models::{BridgeConfig, BridgeOperation, OperationStatus};
+use hamh_core::models::{BridgeConfig, BridgeOperation, OperationStatus};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use uuid::Uuid;

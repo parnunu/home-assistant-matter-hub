@@ -1,4 +1,4 @@
-use hamh-core::models::{BridgeOperation, OperationStatus, OperationType};
+use hamh_core::models::{BridgeOperation, OperationStatus, OperationType};
 use hamh-storage::{FileStorage, StorageError};
 use time::OffsetDateTime;
 use uuid::Uuid;
