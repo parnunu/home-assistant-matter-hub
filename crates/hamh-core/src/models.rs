@@ -97,3 +97,12 @@ pub enum OperationStatus {
     Failed,
     Cancelled,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BridgeDevice {
+    pub entity_id: String,
+    pub device_type: String,
+    pub endpoint_id: u16,
+    pub capabilities: Vec<String>,
+    pub reachable: bool,
+}
