@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>HAMH Rework</title>
+    <link rel="stylesheet" href="/assets/styles.css" />
+  </head>
+  <body>
+    <div class="app">
+      <header class="header">
+        <div>
+          <div class="title">HAMH Rework</div>
+          <div class="subtitle">Rust Matter Hub - local admin UI</div>
+        </div>
+        <div class="actions">
+          <button id="refreshAll" class="btn">Refresh</button>
+        </div>
+      </header>
+
+      <section class="panel">
+        <h2>Create Bridge</h2>
+        <form id="createForm" class="grid">
+          <label>
+            Name
+            <input type="text" id="bridgeName" placeholder="Living Room" required />
+          </label>
+          <label>
+            Port
+            <input type="number" id="bridgePort" min="1024" max="65535" value="5540" required />
+          </label>
+          <label class="full">
+            Include Filters
+            <div class="filter-row">
+              <select id="includeType">
+                <option value="pattern">pattern</option>
+                <option value="domain">domain</option>
+                <option value="platform">platform</option>
+                <option value="entity_category">entity_category</option>
+                <option value="label">label</option>
+                <option value="area">area</option>
+                <option value="entity_id">entity_id</option>
+                <option value="device_id">device_id</option>
+              </select>
+              <input type="text" id="includeValue" placeholder="light.* or kitchen" />
+              <button type="button" id="addInclude" class="btn ghost">Add</button>
+            </div>
+            <div id="includeList" class="pill-list"></div>
+          </label>
+          <label class="full">
+            Exclude Filters
+            <div class="filter-row">
+              <select id="excludeType">
+                <option value="pattern">pattern</option>
+                <option value="domain">domain</option>
+                <option value="platform">platform</option>
+                <option value="entity_category">entity_category</option>
+                <option value="label">label</option>
+                <option value="area">area</option>
+                <option value="entity_id">entity_id</option>
+                <option value="device_id">device_id</option>
+              </select>
+              <input type="text" id="excludeValue" placeholder="sensor.*" />
+              <button type="button" id="addExclude" class="btn ghost">Add</button>
+            </div>
+            <div id="excludeList" class="pill-list"></div>
+          </label>
+          <div class="full">
+            <label class="checkbox">
+              <input type="checkbox" id="coverInvert" />
+              Cover: do not invert percentage
+            </label>
+          </div>
+          <div class="full">
+            <button class="btn primary" type="submit">Create Bridge</button>
+          </div>
+        </form>
+      </section>
+
+      <section class="panel">
+        <h2>Bridges</h2>
+        <div id="bridgeEmpty" class="empty">No bridges yet.</div>
+        <div id="bridgeList" class="bridge-list"></div>
+      </section>
+
+      <section class="panel">
+        <h2>Operations</h2>
+        <div id="opsEmpty" class="empty">No operations yet.</div>
+        <table class="table" id="opsTable">
+          <thead>
+            <tr>
+              <th>Bridge</th>
+              <th>Type</th>
+              <th>Status</th>
+              <th>Queued</th>
+              <th>Error</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </section>
+    </div>
+
+    <script src="/assets/app.js"></script>
+  </body>
+</html>

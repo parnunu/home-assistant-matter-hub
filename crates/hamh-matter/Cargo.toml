@@ -9,6 +9,7 @@ tracing = { workspace = true }
 thiserror = { workspace = true }
 async-trait = { workspace = true }
 uuid = { workspace = true }
+tokio = { workspace = true }
 
 hamh-core = { path = "../hamh-core" }
 

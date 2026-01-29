@@ -13,6 +13,8 @@ use hamh_matter::{MatterAdapter, RsMatterAdapter};
 use hamh_storage::FileStorage;
 use time::OffsetDateTime;
 use tracing_subscriber::EnvFilter;
+use tower_http::services::{ServeDir, ServeFile};
+use std::path::PathBuf;
 
 fn env_or(key: &str, default: &str) -> String {
     env::var(key).unwrap_or_else(|_| default.to_string())
@@ -154,7 +156,13 @@ async fn main() {
     let ha_token = env_or("HAMH_HOME_ASSISTANT_ACCESS_TOKEN", "");
 
     let storage = FileStorage::new(storage_root.clone());
-    let app = build_router(storage.clone());
+    let api = build_router(storage.clone());
+
+    let assets_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("assets");
+    let index_file = assets_root.join("index.html");
+    let static_service = ServeDir::new(assets_root)
+        .not_found_service(ServeFile::new(index_file));
+    let app = api.fallback_service(static_service);
 
     // Initialize adapters (stubbed for now).
     let ha_client = HomeAssistantClient::new(ha_url, ha_token);

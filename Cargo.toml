@@ -26,3 +26,4 @@ thiserror = "2"
 uuid = { version = "1", features = ["v4", "serde"] }
 time = { version = "0.3", features = ["serde", "macros"] }
 async-trait = "0.1"
+tower-http = { version = "0.6", features = ["fs"] }
