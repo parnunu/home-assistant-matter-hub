@@ -3,7 +3,7 @@ use hamh_storage::{FileStorage, StorageError};
 use time::OffsetDateTime;
 use uuid::Uuid;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct OperationQueue {
     storage: FileStorage,
 }

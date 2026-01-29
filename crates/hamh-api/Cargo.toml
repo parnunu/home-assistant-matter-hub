@@ -9,6 +9,8 @@ axum = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 tracing = { workspace = true }
+time = { workspace = true }
+uuid = { workspace = true }
 
 hamh-core = { path = "../hamh-core" }
 hamh-storage = { path = "../hamh-storage" }
