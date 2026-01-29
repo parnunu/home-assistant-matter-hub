@@ -1,90 +1,67 @@
-# Home Assistant Matter Hub (Fork)
+# Home Assistant Matter Hub vNext (Rework)
 
 ![Home-Assistant-Matter-Hub](./docs/assets/hamh-logo-small.png)
 
----
-
-## Fork notice
-
-This repository is a fork of `t0bst4r/home-assistant-matter-hub`.
-Maintained by **parnunu**. Development work is performed by AI only.
-
----
-
-## About
-
-Home Assistant Matter Hub (HAMH) simulates Matter bridges that expose your Home Assistant entities to Matter controllers
-like Alexa, Apple Home, and Google Home. It uses local communication and does not require cloud or port forwarding.
-
----
+## What this is
+Home Assistant Matter Hub (HAMH) is a Matter bridge for Home Assistant. It exposes selected Home Assistant entities to
+Matter controllers like Apple Home, Google Home, and Alexa using local networking (no cloud, no port forwarding).
 
 ## Project status
-
-Upstream announced end of maintenance in January 2026. This fork continues independently for experimentation and
-maintenance as needed.
-
----
+- Active development is on the `Rework` branch.
+- `main` is considered stable and may lag behind `Rework`.
 
 ## Installation (Home Assistant Add-on)
+Production deployment is the Home Assistant add-on.
 
-The supported production install method is the Home Assistant add-on.
-
-1. In Home Assistant, go to Settings -> Add-ons -> Add-on Store.
+1. In Home Assistant: Settings -> Add-ons -> Add-on Store.
 2. Add this add-ons repository URL:
    - https://github.com/parnunu/home-assistant-addons
-3. Refresh the Add-on Store, then install Home Assistant Matter Hub.
+3. Refresh the Add-on Store and install **Home Assistant Matter Hub**.
 4. Configure as needed and click Start.
 
-For full details, see:
-- docs/Getting Started/Installation.md
-
----
-
-## Documentation
-
-Start here for guides, limitations, and troubleshooting:
-
-- docs/Getting Started/Installation.md
-- docs/Getting Started/Bridge Configuration.md
-- docs/Developer Documentation/README.md
-- docs/Developer Documentation/local-dev.md
-
----
-
-## Home Assistant Add-on
-
-Production deployment remains the Home Assistant add-on.
-The add-on build files live in:
-
-- apps/home-assistant-matter-hub/addon.Dockerfile
-- apps/home-assistant-matter-hub/addon.docker-entrypoint.sh
-- apps/home-assistant-matter-hub/build.js
-
----
-
 ## Local development (PC)
-
 Requirements:
 - Node.js 22
 - pnpm 10.28.1
 
-Run backend:
+Create a `.env` at repo root (see `.env.sample`) and set your Home Assistant URL and token.
 
+Run backend:
+```
 pnpm --filter @home-assistant-matter-hub/backend run serve
+```
 
 Run frontend:
-
+```
 pnpm --filter @home-assistant-matter-hub/frontend run dev
+```
 
----
+Run both:
+```
+pnpm run dev:pc
+```
 
-## Contributing
+Backend API: http://localhost:8482
+Frontend UI: http://localhost:5173
 
-This fork follows an evidence-first workflow and uses child issues + PRs per work item.
-See AGENTS.md for the exact rules.
+## API
+API base: `/api/matter`
 
----
+## Logs
+Persistent logs are stored under `${HAMH_STORAGE_LOCATION}/logs`:
+- `backend.log`
+- `bridge-delete.log`
+- `backend-crash.log`
+
+## Design spec
+The vNext design spec for the Rework branch is here:
+- `docs/Design-Spec-vNext.md`
+
+## Documentation
+- `docs/Getting Started/Installation.md`
+- `docs/Getting Started/Bridge Configuration.md`
+- `docs/Developer Documentation/README.md`
+- `docs/Developer Documentation/local-dev.md`
 
 ## License
-
-See LICENSE.
+See `LICENSE`.
