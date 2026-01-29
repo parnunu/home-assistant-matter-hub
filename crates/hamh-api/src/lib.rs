@@ -144,10 +144,11 @@ async fn start_bridge(
 }
 
 async fn list_devices(
-    Path(_id): Path<Uuid>,
-    State(_state): State<Arc<AppState>>,
+    Path(id): Path<Uuid>,
+    State(state): State<Arc<AppState>>,
 ) -> Result<Json<Vec<BridgeDevice>>, ApiError> {
-    Ok(Json(Vec::new()))
+    let devices = state.storage.list_bridge_devices(id)?;
+    Ok(Json(devices))
 }
 
 #[derive(Debug)]

@@ -1,8 +1,9 @@
+use std::collections::BTreeMap;
 use std::fs;
 use std::io::Write;
 use std::path::PathBuf;
 
-use hamh_core::models::{BridgeConfig, BridgeOperation, OperationStatus};
+use hamh_core::models::{BridgeConfig, BridgeDevice, BridgeOperation, OperationStatus};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use uuid::Uuid;
@@ -22,8 +23,22 @@ pub struct FileStorage {
 
 #[derive(Debug, Serialize, Deserialize)]
 struct StorageState {
+    #[serde(default)]
     bridges: Vec<BridgeConfig>,
+    #[serde(default)]
     operations: Vec<BridgeOperation>,
+    #[serde(default)]
+    devices: BTreeMap<String, Vec<BridgeDevice>>,
+}
+
+impl Default for StorageState {
+    fn default() -> Self {
+        Self {
+            bridges: Vec::new(),
+            operations: Vec::new(),
+            devices: BTreeMap::new(),
+        }
+    }
 }
 
 impl FileStorage {
@@ -34,10 +49,7 @@ impl FileStorage {
     fn load(&self) -> Result<StorageState, StorageError> {
         let path = self.root.join("storage.json");
         if !path.exists() {
-            return Ok(StorageState {
-                bridges: Vec::new(),
-                operations: Vec::new(),
-            });
+            return Ok(StorageState::default());
         }
         let data = fs::read_to_string(path)?;
         Ok(serde_json::from_str(&data)?)
@@ -85,6 +97,32 @@ impl FileStorage {
     pub fn delete_bridge(&self, id: Uuid) -> Result<(), StorageError> {
         let mut state = self.load()?;
         state.bridges.retain(|b| b.id != id);
+        state.devices.remove(&id.to_string());
+        self.save(&state)
+    }
+
+    pub fn list_bridge_devices(&self, id: Uuid) -> Result<Vec<BridgeDevice>, StorageError> {
+        let state = self.load()?;
+        Ok(state
+            .devices
+            .get(&id.to_string())
+            .cloned()
+            .unwrap_or_default())
+    }
+
+    pub fn set_bridge_devices(
+        &self,
+        id: Uuid,
+        devices: Vec<BridgeDevice>,
+    ) -> Result<(), StorageError> {
+        let mut state = self.load()?;
+        state.devices.insert(id.to_string(), devices);
+        self.save(&state)
+    }
+
+    pub fn delete_bridge_devices(&self, id: Uuid) -> Result<(), StorageError> {
+        let mut state = self.load()?;
+        state.devices.remove(&id.to_string());
         self.save(&state)
     }
 

@@ -3,15 +3,141 @@ use std::env;
 use std::net::SocketAddr;
 
 use hamh_api::build_router;
+use hamh_core::device_map::map_descriptor_to_device_type;
+use hamh_core::filter::matches_filter;
+use hamh_core::models::{
+    BridgeConfig, BridgeDevice, BridgeOperation, OperationStatus, OperationType,
+};
 use hamh_ha::{HassAdapter, HomeAssistantAdapter, HomeAssistantClient};
 use hamh_matter::{MatterAdapter, RsMatterAdapter};
 use hamh_storage::FileStorage;
-use hamh_core::models::{OperationStatus, OperationType};
 use time::OffsetDateTime;
 use tracing_subscriber::EnvFilter;
 
 fn env_or(key: &str, default: &str) -> String {
     env::var(key).unwrap_or_else(|_| default.to_string())
+}
+
+async fn build_bridge_devices(
+    bridge: &BridgeConfig,
+    ha: &impl HomeAssistantAdapter,
+) -> Result<Vec<BridgeDevice>, String> {
+    let descriptors = ha
+        .list_entity_descriptors()
+        .await
+        .map_err(|err| err.to_string())?;
+    let mut devices = Vec::new();
+
+    for descriptor in descriptors {
+        if !matches_filter(&bridge.filter, &descriptor) {
+            continue;
+        }
+        if let Some(device_type) = map_descriptor_to_device_type(&descriptor) {
+            devices.push(BridgeDevice {
+                entity_id: descriptor.entity_id,
+                device_type,
+                endpoint_id: 0,
+                capabilities: Vec::new(),
+                reachable: true,
+            });
+        }
+    }
+
+    if devices
+        .iter()
+        .any(|device| device.device_type == "RoboticVacuumCleaner")
+    {
+        devices.retain(|device| device.device_type == "RoboticVacuumCleaner");
+    }
+
+    for (idx, device) in devices.iter_mut().enumerate() {
+        device.endpoint_id = (idx + 1) as u16;
+    }
+
+    Ok(devices)
+}
+
+fn resolve_bridge(storage: &FileStorage, id: uuid::Uuid) -> Result<BridgeConfig, String> {
+    match storage.get_bridge(id).map_err(|err| err.to_string())? {
+        Some(bridge) => Ok(bridge),
+        None => Err("bridge not found".to_string()),
+    }
+}
+
+async fn process_operation(
+    op: &BridgeOperation,
+    storage: &FileStorage,
+    ha: &impl HomeAssistantAdapter,
+    matter: &impl MatterAdapter,
+    handles: &mut HashMap<uuid::Uuid, hamh_matter::MatterBridgeHandle>,
+) -> Result<(), String> {
+    match op.op_type {
+        OperationType::Create | OperationType::Update => {
+            let bridge = resolve_bridge(storage, op.bridge_id)?;
+            let devices = build_bridge_devices(&bridge, ha).await?;
+            storage
+                .set_bridge_devices(bridge.id, devices)
+                .map_err(|err| err.to_string())?;
+            Ok(())
+        }
+        OperationType::Start => {
+            let bridge = resolve_bridge(storage, op.bridge_id)?;
+            let devices = build_bridge_devices(&bridge, ha).await?;
+            storage
+                .set_bridge_devices(bridge.id, devices)
+                .map_err(|err| err.to_string())?;
+            let handle = matter
+                .start_bridge(&bridge)
+                .await
+                .map_err(|err| err.to_string())?;
+            handles.insert(op.bridge_id, handle);
+            Ok(())
+        }
+        OperationType::Stop => {
+            if let Some(handle) = handles.remove(&op.bridge_id) {
+                matter
+                    .stop_bridge(&handle)
+                    .await
+                    .map_err(|err| err.to_string())
+            } else {
+                Err("bridge not running".to_string())
+            }
+        }
+        OperationType::Refresh => {
+            let bridge = resolve_bridge(storage, op.bridge_id)?;
+            let devices = build_bridge_devices(&bridge, ha).await?;
+            storage
+                .set_bridge_devices(bridge.id, devices)
+                .map_err(|err| err.to_string())?;
+            if let Some(handle) = handles.get(&op.bridge_id) {
+                matter
+                    .refresh_bridge(handle)
+                    .await
+                    .map_err(|err| err.to_string())?;
+            }
+            Ok(())
+        }
+        OperationType::FactoryReset => {
+            if let Some(handle) = handles.get(&op.bridge_id) {
+                matter
+                    .factory_reset(handle)
+                    .await
+                    .map_err(|err| err.to_string())?;
+                Ok(())
+            } else {
+                Err("bridge not running".to_string())
+            }
+        }
+        OperationType::Delete => {
+            if let Some(handle) = handles.remove(&op.bridge_id) {
+                let _ = matter.stop_bridge(&handle).await;
+            }
+            storage
+                .delete_bridge(op.bridge_id)
+                .map_err(|err| err.to_string())?;
+            Ok(())
+        }
+    }
 }
 
 #[tokio::main]
@@ -46,9 +172,12 @@ async fn main() {
             if let Err(err) = runner_ha.connect().await {
                 tracing::debug!("HA connect failed: {err}");
             } else if !ha_logged {
-                match runner_ha.list_entities().await {
+                match runner_ha.list_entity_descriptors().await {
                     Ok(entities) => {
-                        tracing::info!("Home Assistant reachable. Entities: {}", entities.len());
+                        tracing::info!(
+                            "Home Assistant reachable. Entity descriptors: {}",
+                            entities.len()
+                        );
                         ha_logged = true;
                     }
                     Err(err) => tracing::debug!("HA list_entities failed: {err}"),
@@ -70,43 +199,21 @@ async fn main() {
                     tracing::warn!("Failed to mark op running: {err}");
                 }
 
-                let result: Result<(), hamh_matter::MatterError> = match op.op_type {
-                    OperationType::Start => match runner_storage.get_bridge(op.bridge_id) {
-                        Ok(Some(bridge)) => match runner_matter.start_bridge(&bridge).await {
-                            Ok(handle) => {
-                                handles.insert(op.bridge_id, handle);
-                                Ok(())
-                            }
-                            Err(err) => Err(err),
-                        },
-                        Ok(None) => Err(hamh_matter::MatterError::NotImplemented),
-                        Err(_) => Err(hamh_matter::MatterError::NotImplemented),
-                    },
-                    OperationType::Stop => match handles.get(&op.bridge_id) {
-                        Some(handle) => runner_matter.stop_bridge(handle).await,
-                        None => Err(hamh_matter::MatterError::NotImplemented),
-                    },
-                    OperationType::Refresh => match handles.get(&op.bridge_id) {
-                        Some(handle) => runner_matter.refresh_bridge(handle).await,
-                        None => Err(hamh_matter::MatterError::NotImplemented),
-                    },
-                    OperationType::FactoryReset => match handles.get(&op.bridge_id) {
-                        Some(handle) => runner_matter.factory_reset(handle).await,
-                        None => Err(hamh_matter::MatterError::NotImplemented),
-                    },
-                    OperationType::Delete => {
-                        let _ = runner_storage.delete_bridge(op.bridge_id);
-                        Ok(())
-                    }
-                    _ => Ok(()),
-                };
+                let result = process_operation(
+                    &op,
+                    &runner_storage,
+                    &runner_ha,
+                    &runner_matter,
+                    &mut handles,
+                )
+                .await;
 
                 op.finished_at = Some(OffsetDateTime::now_utc());
                 match result {
                     Ok(_) => op.status = OperationStatus::Completed,
                     Err(err) => {
                         op.status = OperationStatus::Failed;
-                        op.error = Some(format!("{err}"));
+                        op.error = Some(err);
                     }
                 }
 
