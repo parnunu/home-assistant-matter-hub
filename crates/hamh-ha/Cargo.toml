@@ -7,5 +7,7 @@ license = "Apache-2.0"
 [dependencies]
 tracing = { workspace = true }
 thiserror = { workspace = true }
+async-trait = { workspace = true }
+uuid = { workspace = true }
 
 # Planned: hass-rs for Home Assistant websocket integration.

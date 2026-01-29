@@ -7,5 +7,9 @@ license = "Apache-2.0"
 [dependencies]
 tracing = { workspace = true }
 thiserror = { workspace = true }
+async-trait = { workspace = true }
+uuid = { workspace = true }
+
+hamh-core = { path = "../hamh-core" }
 
 # Planned: rs-matter for Matter bridge implementation.
