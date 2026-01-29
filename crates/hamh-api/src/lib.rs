@@ -6,7 +6,7 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
-use hamh_core::models::{BridgeConfig, BridgeOperation, OperationType};
+use hamh_core::models::{BridgeConfig, BridgeDevice, BridgeOperation, OperationType};
 use hamh_ops::OperationQueue;
 use hamh_storage::{FileStorage, StorageError};
 use time::OffsetDateTime;
@@ -32,6 +32,19 @@ pub fn build_router(storage: FileStorage) -> Router {
             "/api/matter/bridges/:id/actions/start",
             post(start_bridge),
         )
+        .route(
+            "/api/matter/bridges/:id/actions/stop",
+            post(stop_bridge),
+        )
+        .route(
+            "/api/matter/bridges/:id/actions/refresh",
+            post(refresh_bridge),
+        )
+        .route(
+            "/api/matter/bridges/:id/actions/factory-reset",
+            post(factory_reset_bridge),
+        )
+        .route("/api/matter/bridges/:id/devices", get(list_devices))
         .route("/api/matter/operations", get(list_operations))
         .route("/api/matter/health", get(health))
         .with_state(state)
@@ -98,12 +111,43 @@ async fn delete_bridge(
     Ok(StatusCode::NO_CONTENT)
 }
 
+async fn stop_bridge(
+    Path(id): Path<Uuid>,
+    State(state): State<Arc<AppState>>,
+) -> Result<StatusCode, ApiError> {
+    let _ = state.ops.enqueue(id, OperationType::Stop)?;
+    Ok(StatusCode::ACCEPTED)
+}
+
+async fn refresh_bridge(
+    Path(id): Path<Uuid>,
+    State(state): State<Arc<AppState>>,
+) -> Result<StatusCode, ApiError> {
+    let _ = state.ops.enqueue(id, OperationType::Refresh)?;
+    Ok(StatusCode::ACCEPTED)
+}
+
+async fn factory_reset_bridge(
+    Path(id): Path<Uuid>,
+    State(state): State<Arc<AppState>>,
+) -> Result<StatusCode, ApiError> {
+    let _ = state.ops.enqueue(id, OperationType::FactoryReset)?;
+    Ok(StatusCode::ACCEPTED)
+}
+
 async fn start_bridge(
     Path(id): Path<Uuid>,
     State(state): State<Arc<AppState>>,
 ) -> Result<StatusCode, ApiError> {
     let _ = state.ops.enqueue(id, OperationType::Start)?;
     Ok(StatusCode::ACCEPTED)
+}
+
+async fn list_devices(
+    Path(_id): Path<Uuid>,
+    State(_state): State<Arc<AppState>>,
+) -> Result<Json<Vec<BridgeDevice>>, ApiError> {
+    Ok(Json(Vec::new()))
 }
 
 #[derive(Debug)]

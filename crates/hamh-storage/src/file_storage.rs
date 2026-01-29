@@ -82,6 +82,12 @@ impl FileStorage {
         self.save(&state)
     }
 
+    pub fn delete_bridge(&self, id: Uuid) -> Result<(), StorageError> {
+        let mut state = self.load()?;
+        state.bridges.retain(|b| b.id != id);
+        self.save(&state)
+    }
+
     pub fn add_operation(&self, op: BridgeOperation) -> Result<(), StorageError> {
         let mut state = self.load()?;
         state.operations.insert(0, op);

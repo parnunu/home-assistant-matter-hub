@@ -46,7 +46,7 @@
 - id, name, port, filter, featureFlags, commissioning, createdAt, updatedAt
 
 ### BridgeFilter
-- include: array of { type: domain | entity_id | area | label | device_id, value }
+- include: array of { type: pattern | domain | platform | entity_category | label | area | entity_id | device_id, value }
 - exclude: same schema
 
 ### BridgeRuntimeState
@@ -108,8 +108,23 @@ Base: /api/matter
 
 ## 10) Endpoint Mapping
 - Mapping table from HA domains to Matter devices:
+  - automation -> OnOffPlugInUnit
+  - button -> OnOffPlugInUnit (auto-off after 3s)
+  - binary_sensor -> OnOffSensor / ContactSensor / OccupancySensor / WaterLeakDetector
+  - climate -> Thermostat
+  - cover -> WindowCovering
+  - fan -> Fan
+  - humidifier -> OnOffPlugInUnit + Level Control
+  - input_boolean -> OnOffPlugInUnit
+  - input_button -> OnOffPlugInUnit (auto-off after 3s)
   - light -> DimmableLight / ColorTemperatureLight / ExtendedColorLight
+  - lock -> DoorLock
+  - media_player -> Speaker
+  - scene -> OnOffPlugInUnit
+  - script -> OnOffPlugInUnit
+  - sensor -> TemperatureSensor / HumiditySensor / IlluminanceSensor
   - switch -> OnOffSwitch
+  - vacuum -> RoboticVacuumCleaner (Apple Home only; bridge must contain only this device)
   - fan, cover, sensor, etc. as defined in mapping spec
 - Behaviors:
   - HomeAssistantEntityBehavior adapter for HA state/actions

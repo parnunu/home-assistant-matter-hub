@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::env;
 use std::net::SocketAddr;
 
@@ -39,6 +40,7 @@ async fn main() {
     let runner_ha = ha_adapter.clone();
     let runner_matter = matter_adapter.clone();
     let _ = tokio::spawn(async move {
+        let mut handles: HashMap<uuid::Uuid, hamh_matter::MatterBridgeHandle> = HashMap::new();
         loop {
             if let Err(err) = runner_ha.connect().await {
                 tracing::debug!("HA connect not implemented: {err}");
@@ -61,10 +63,32 @@ async fn main() {
 
                 let result: Result<(), hamh_matter::MatterError> = match op.op_type {
                     OperationType::Start => match runner_storage.get_bridge(op.bridge_id) {
-                        Ok(Some(bridge)) => runner_matter.start_bridge(&bridge).await.map(|_| ()),
+                        Ok(Some(bridge)) => match runner_matter.start_bridge(&bridge).await {
+                            Ok(handle) => {
+                                handles.insert(op.bridge_id, handle);
+                                Ok(())
+                            }
+                            Err(err) => Err(err),
+                        },
                         Ok(None) => Err(hamh_matter::MatterError::NotImplemented),
                         Err(_) => Err(hamh_matter::MatterError::NotImplemented),
                     },
+                    OperationType::Stop => match handles.get(&op.bridge_id) {
+                        Some(handle) => runner_matter.stop_bridge(handle).await,
+                        None => Err(hamh_matter::MatterError::NotImplemented),
+                    },
+                    OperationType::Refresh => match handles.get(&op.bridge_id) {
+                        Some(handle) => runner_matter.refresh_bridge(handle).await,
+                        None => Err(hamh_matter::MatterError::NotImplemented),
+                    },
+                    OperationType::FactoryReset => match handles.get(&op.bridge_id) {
+                        Some(handle) => runner_matter.factory_reset(handle).await,
+                        None => Err(hamh_matter::MatterError::NotImplemented),
+                    },
+                    OperationType::Delete => {
+                        let _ = runner_storage.delete_bridge(op.bridge_id);
+                        Ok(())
+                    }
                     _ => Ok(()),
                 };
 

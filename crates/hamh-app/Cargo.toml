@@ -16,3 +16,4 @@ hamh-ha = { path = "../hamh-ha" }
 hamh-matter = { path = "../hamh-matter" }
 hamh-core = { path = "../hamh-core" }
 time = { workspace = true }
+uuid = { workspace = true }

@@ -14,6 +14,8 @@ pub struct MatterBridgeHandle {
 pub trait MatterAdapter: Send + Sync {
     async fn start_bridge(&self, bridge: &BridgeConfig) -> Result<MatterBridgeHandle, MatterError>;
     async fn stop_bridge(&self, handle: &MatterBridgeHandle) -> Result<(), MatterError>;
+    async fn refresh_bridge(&self, handle: &MatterBridgeHandle) -> Result<(), MatterError>;
+    async fn factory_reset(&self, handle: &MatterBridgeHandle) -> Result<(), MatterError>;
 }
 
 #[derive(Debug, Default, Clone)]
@@ -27,6 +29,16 @@ impl MatterAdapter for RsMatterAdapter {
     }
 
     async fn stop_bridge(&self, handle: &MatterBridgeHandle) -> Result<(), MatterError> {
+        let _ = handle;
+        Err(MatterError::NotImplemented)
+    }
+
+    async fn refresh_bridge(&self, handle: &MatterBridgeHandle) -> Result<(), MatterError> {
+        let _ = handle;
+        Err(MatterError::NotImplemented)
+    }
+
+    async fn factory_reset(&self, handle: &MatterBridgeHandle) -> Result<(), MatterError> {
         let _ = handle;
         Err(MatterError::NotImplemented)
     }

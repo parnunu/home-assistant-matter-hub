@@ -21,6 +21,7 @@ pub struct BridgeFilter {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EntityFilter {
+    #[serde(rename = "type")]
     pub kind: FilterKind,
     pub value: String,
 }
@@ -28,8 +29,11 @@ pub struct EntityFilter {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum FilterKind {
+    Pattern,
     Domain,
+    Platform,
     EntityId,
+    EntityCategory,
     Area,
     Label,
     DeviceId,
