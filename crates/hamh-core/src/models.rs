@@ -53,6 +53,12 @@ pub struct BridgeRuntimeState {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BridgeRuntimeEntry {
+    pub bridge_id: Uuid,
+    pub state: BridgeRuntimeState,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum BridgeStatus {
     Stopped,
@@ -103,6 +109,18 @@ pub struct BridgeDevice {
     pub entity_id: String,
     pub device_type: String,
     pub endpoint_id: u16,
+    #[serde(default)]
+    pub display_name: String,
+    #[serde(default)]
+    pub area: Option<String>,
     pub capabilities: Vec<String>,
     pub reachable: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PairingInfo {
+    pub qr_text: String,
+    pub qr_unicode: String,
+    pub manual_code: String,
+    pub discriminator: u16,
 }

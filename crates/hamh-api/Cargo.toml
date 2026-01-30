@@ -15,3 +15,10 @@ uuid = { workspace = true }
 hamh-core = { path = "../hamh-core" }
 hamh-storage = { path = "../hamh-storage" }
 hamh-ops = { path = "../hamh-ops" }
+hamh-matter = { path = "../hamh-matter" }
+hamh-ha = { path = "../hamh-ha" }
+
+[dev-dependencies]
+tokio = { workspace = true }
+tower = { version = "0.4", features = ["util"] }
+tempfile = "3"

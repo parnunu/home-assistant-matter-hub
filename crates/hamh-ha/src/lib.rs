@@ -77,6 +77,32 @@ impl HomeAssistantClient {
         Ok(res.json::<Vec<HaLabelRegistryEntry>>().await?)
     }
 
+    pub async fn call_service(
+        &self,
+        domain: &str,
+        service: &str,
+        payload: Value,
+    ) -> Result<(), HaError> {
+        let client = reqwest::Client::new();
+        let url = format!(
+            "{}/api/services/{}/{}",
+            self.url.trim_end_matches('/'),
+            domain,
+            service
+        );
+        let res = client
+            .post(url)
+            .headers(self.auth_headers()?)
+            .json(&payload)
+            .send()
+            .await?;
+        if res.status().is_success() {
+            Ok(())
+        } else {
+            Err(HaError::NotImplemented)
+        }
+    }
+
     fn auth_headers(&self) -> Result<HeaderMap, HaError> {
         let mut headers = HeaderMap::new();
         let value = HeaderValue::from_str(&format!("Bearer {}", self.token))

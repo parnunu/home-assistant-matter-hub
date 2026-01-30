@@ -1,15 +1,17 @@
 use std::collections::HashMap;
 use std::env;
 use std::net::SocketAddr;
+use std::time::Instant;
 
 use hamh_api::build_router;
 use hamh_core::device_map::map_descriptor_to_device_type;
-use hamh_core::filter::matches_filter;
+use hamh_core::filter::{matches_filter, EntityDescriptor};
 use hamh_core::models::{
-    BridgeConfig, BridgeDevice, BridgeOperation, OperationStatus, OperationType,
+    BridgeConfig, BridgeDevice, BridgeOperation, BridgeRuntimeState, BridgeStatus,
+    OperationStatus, OperationType,
 };
 use hamh_ha::{HassAdapter, HomeAssistantAdapter, HomeAssistantClient};
-use hamh_matter::{MatterAdapter, RsMatterAdapter};
+use hamh_matter::{EntityState, MatterAdapter, RsMatterAdapter};
 use hamh_storage::FileStorage;
 use time::OffsetDateTime;
 use tracing_subscriber::EnvFilter;
@@ -18,6 +20,15 @@ use std::path::PathBuf;
 
 fn env_or(key: &str, default: &str) -> String {
     env::var(key).unwrap_or_else(|_| default.to_string())
+}
+
+fn display_name_from_descriptor(descriptor: &EntityDescriptor) -> String {
+    descriptor
+        .attributes
+        .get("friendly_name")
+        .and_then(|value| value.as_str())
+        .map(|value| value.to_string())
+        .unwrap_or_else(|| descriptor.entity_id.clone())
 }
 
 async fn build_bridge_devices(
@@ -39,6 +50,8 @@ async fn build_bridge_devices(
                 entity_id: descriptor.entity_id,
                 device_type,
                 endpoint_id: 0,
+                display_name: display_name_from_descriptor(&descriptor),
+                area: descriptor.area.clone(),
                 capabilities: Vec::new(),
                 reachable: true,
             });
@@ -53,7 +66,7 @@ async fn build_bridge_devices(
     }
 
     for (idx, device) in devices.iter_mut().enumerate() {
-        device.endpoint_id = (idx + 1) as u16;
+        device.endpoint_id = (idx + 2) as u16;
     }
 
     Ok(devices)
@@ -64,6 +77,10 @@ fn resolve_bridge(storage: &FileStorage, id: uuid::Uuid) -> Result<BridgeConfig,
         Some(bridge) => Ok(bridge),
         None => Err("bridge not found".to_string()),
     }
+}
+
+fn is_on_state(state: &str) -> bool {
+    matches!(state, "on" | "open" | "locked" | "playing")
 }
 
 async fn process_operation(
@@ -78,18 +95,26 @@ async fn process_operation(
             let bridge = resolve_bridge(storage, op.bridge_id)?;
             let devices = build_bridge_devices(&bridge, ha).await?;
             storage
-                .set_bridge_devices(bridge.id, devices)
+                .set_bridge_devices(bridge.id, devices.clone())
                 .map_err(|err| err.to_string())?;
+            if let Some(handle) = handles.remove(&op.bridge_id) {
+                let _ = matter.stop_bridge(&handle).await;
+            }
+            let handle = matter
+                .start_bridge(&bridge, &devices)
+                .await
+                .map_err(|err| err.to_string())?;
+            handles.insert(op.bridge_id, handle);
             Ok(())
         }
         OperationType::Start => {
             let bridge = resolve_bridge(storage, op.bridge_id)?;
             let devices = build_bridge_devices(&bridge, ha).await?;
             storage
-                .set_bridge_devices(bridge.id, devices)
+                .set_bridge_devices(bridge.id, devices.clone())
                 .map_err(|err| err.to_string())?;
             let handle = matter
-                .start_bridge(&bridge)
+                .start_bridge(&bridge, &devices)
                 .await
                 .map_err(|err| err.to_string())?;
             handles.insert(op.bridge_id, handle);
@@ -109,13 +134,19 @@ async fn process_operation(
             let bridge = resolve_bridge(storage, op.bridge_id)?;
             let devices = build_bridge_devices(&bridge, ha).await?;
             storage
-                .set_bridge_devices(bridge.id, devices)
+                .set_bridge_devices(bridge.id, devices.clone())
                 .map_err(|err| err.to_string())?;
             if let Some(handle) = handles.get(&op.bridge_id) {
                 matter
-                    .refresh_bridge(handle)
+                    .refresh_bridge(handle, &devices)
                     .await
                     .map_err(|err| err.to_string())?;
+            } else {
+                let handle = matter
+                    .start_bridge(&bridge, &devices)
+                    .await
+                    .map_err(|err| err.to_string())?;
+                handles.insert(op.bridge_id, handle);
             }
             Ok(())
         }
@@ -137,8 +168,27 @@ async fn process_operation(
             storage
                 .delete_bridge(op.bridge_id)
                 .map_err(|err| err.to_string())?;
+            let _ = storage.delete_bridge_runtime(op.bridge_id);
             Ok(())
         }
+    }
+}
+
+fn set_runtime_state(
+    storage: &FileStorage,
+    bridge_id: uuid::Uuid,
+    status: BridgeStatus,
+    operation_id: Option<uuid::Uuid>,
+    last_error: Option<String>,
+) {
+    let runtime = BridgeRuntimeState {
+        status,
+        last_error,
+        operation_id,
+        updated_at: OffsetDateTime::now_utc(),
+    };
+    if let Err(err) = storage.set_bridge_runtime(bridge_id, runtime) {
+        tracing::warn!("Failed to set runtime state: {err}");
     }
 }
 
@@ -147,6 +197,7 @@ async fn main() {
     tracing_subscriber::fmt()
         .with_env_filter(EnvFilter::from_default_env())
         .init();
+    let _ = dotenvy::dotenv();
 
     let port: u16 = env_or("HAMH_API_PORT", "8482")
         .parse()
@@ -156,18 +207,18 @@ async fn main() {
     let ha_token = env_or("HAMH_HOME_ASSISTANT_ACCESS_TOKEN", "");
 
     let storage = FileStorage::new(storage_root.clone());
-    let api = build_router(storage.clone());
+
+    // Initialize adapters (stubbed for now).
+    let ha_client = HomeAssistantClient::new(ha_url, ha_token);
+    let api = build_router(storage.clone(), Some(ha_client.clone()));
+    let ha_adapter = HassAdapter { client: ha_client };
+    let matter_adapter = RsMatterAdapter::default();
 
     let assets_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("assets");
     let index_file = assets_root.join("index.html");
     let static_service = ServeDir::new(assets_root)
         .not_found_service(ServeFile::new(index_file));
     let app = api.fallback_service(static_service);
-
-    // Initialize adapters (stubbed for now).
-    let ha_client = HomeAssistantClient::new(ha_url, ha_token);
-    let ha_adapter = HassAdapter { client: ha_client };
-    let matter_adapter = RsMatterAdapter::default();
 
     // Operation runner (simple loop for now).
     let runner_storage = storage.clone();
@@ -176,6 +227,7 @@ async fn main() {
     let _ = tokio::spawn(async move {
         let mut handles: HashMap<uuid::Uuid, hamh_matter::MatterBridgeHandle> = HashMap::new();
         let mut ha_logged = false;
+        let mut last_state_sync = Instant::now();
         loop {
             if let Err(err) = runner_ha.connect().await {
                 tracing::debug!("HA connect failed: {err}");
@@ -207,6 +259,23 @@ async fn main() {
                     tracing::warn!("Failed to mark op running: {err}");
                 }
 
+                let pre_status = match op.op_type {
+                    OperationType::Stop => BridgeStatus::Stopping,
+                    OperationType::Delete => BridgeStatus::Deleting,
+                    OperationType::FactoryReset => BridgeStatus::Running,
+                    OperationType::Create
+                    | OperationType::Update
+                    | OperationType::Start
+                    | OperationType::Refresh => BridgeStatus::Starting,
+                };
+                set_runtime_state(
+                    &runner_storage,
+                    op.bridge_id,
+                    pre_status,
+                    Some(op.operation_id),
+                    None,
+                );
+
                 let result = process_operation(
                     &op,
                     &runner_storage,
@@ -218,16 +287,85 @@ async fn main() {
 
                 op.finished_at = Some(OffsetDateTime::now_utc());
                 match result {
-                    Ok(_) => op.status = OperationStatus::Completed,
+                    Ok(_) => {
+                        op.status = OperationStatus::Completed;
+                        let post_status = match op.op_type {
+                            OperationType::Stop => BridgeStatus::Stopped,
+                            OperationType::Delete => BridgeStatus::Stopped,
+                            OperationType::FactoryReset => BridgeStatus::Running,
+                            OperationType::Create
+                            | OperationType::Update
+                            | OperationType::Start
+                            | OperationType::Refresh => BridgeStatus::Running,
+                        };
+                        set_runtime_state(
+                            &runner_storage,
+                            op.bridge_id,
+                            post_status,
+                            Some(op.operation_id),
+                            None,
+                        );
+                    }
                     Err(err) => {
                         op.status = OperationStatus::Failed;
                         op.error = Some(err);
+                        set_runtime_state(
+                            &runner_storage,
+                            op.bridge_id,
+                            BridgeStatus::Error,
+                            Some(op.operation_id),
+                            op.error.clone(),
+                        );
                     }
                 }
 
                 if let Err(err) = runner_storage.update_operation(op) {
                     tracing::warn!("Failed to update op status: {err}");
                 }
+            }
+
+            if last_state_sync.elapsed().as_secs() >= 5 && !handles.is_empty() {
+                match runner_ha.list_entities().await {
+                    Ok(entities) => {
+                        let mut state_map: HashMap<String, bool> = HashMap::new();
+                        for entity in entities {
+                            state_map.insert(entity.entity_id, is_on_state(&entity.state));
+                        }
+
+                        for (bridge_id, handle) in handles.iter() {
+                            let devices = match runner_storage.list_bridge_devices(*bridge_id) {
+                                Ok(list) => list,
+                                Err(err) => {
+                                    tracing::warn!("Failed to load devices for {bridge_id}: {err}");
+                                    continue;
+                                }
+                            };
+
+                            let mut updates = Vec::new();
+                            for device in devices {
+                                if let Some(on) = state_map.get(&device.entity_id) {
+                                    updates.push(EntityState {
+                                        entity_id: device.entity_id,
+                                        on: *on,
+                                    });
+                                }
+                            }
+
+                            if !updates.is_empty() {
+                                if let Err(err) = runner_matter
+                                    .apply_entity_states(handle, &updates)
+                                    .await
+                                {
+                                    tracing::debug!("Matter update failed: {err}");
+                                }
+                            }
+                        }
+                    }
+                    Err(err) => {
+                        tracing::debug!("HA state sync failed: {err}");
+                    }
+                }
+                last_state_sync = Instant::now();
             }
 
             tokio::time::sleep(std::time::Duration::from_millis(500)).await;

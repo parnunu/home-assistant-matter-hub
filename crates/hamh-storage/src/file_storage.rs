@@ -3,7 +3,10 @@ use std::fs;
 use std::io::Write;
 use std::path::PathBuf;
 
-use hamh_core::models::{BridgeConfig, BridgeDevice, BridgeOperation, OperationStatus};
+use hamh_core::models::{
+    BridgeConfig, BridgeDevice, BridgeOperation, BridgeRuntimeEntry, BridgeRuntimeState,
+    OperationStatus,
+};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use uuid::Uuid;
@@ -29,6 +32,8 @@ struct StorageState {
     operations: Vec<BridgeOperation>,
     #[serde(default)]
     devices: BTreeMap<String, Vec<BridgeDevice>>,
+    #[serde(default)]
+    runtime: BTreeMap<String, BridgeRuntimeState>,
 }
 
 impl Default for StorageState {
@@ -37,6 +42,7 @@ impl Default for StorageState {
             bridges: Vec::new(),
             operations: Vec::new(),
             devices: BTreeMap::new(),
+            runtime: BTreeMap::new(),
         }
     }
 }
@@ -98,6 +104,7 @@ impl FileStorage {
         let mut state = self.load()?;
         state.bridges.retain(|b| b.id != id);
         state.devices.remove(&id.to_string());
+        state.runtime.remove(&id.to_string());
         self.save(&state)
     }
 
@@ -123,6 +130,44 @@ impl FileStorage {
     pub fn delete_bridge_devices(&self, id: Uuid) -> Result<(), StorageError> {
         let mut state = self.load()?;
         state.devices.remove(&id.to_string());
+        self.save(&state)
+    }
+
+    pub fn list_bridge_runtime(&self) -> Result<Vec<BridgeRuntimeEntry>, StorageError> {
+        let state = self.load()?;
+        let mut out = Vec::new();
+        for (key, value) in state.runtime {
+            if let Ok(bridge_id) = Uuid::parse_str(&key) {
+                out.push(BridgeRuntimeEntry {
+                    bridge_id,
+                    state: value,
+                });
+            }
+        }
+        Ok(out)
+    }
+
+    pub fn get_bridge_runtime(
+        &self,
+        id: Uuid,
+    ) -> Result<Option<BridgeRuntimeState>, StorageError> {
+        let state = self.load()?;
+        Ok(state.runtime.get(&id.to_string()).cloned())
+    }
+
+    pub fn set_bridge_runtime(
+        &self,
+        id: Uuid,
+        runtime: BridgeRuntimeState,
+    ) -> Result<(), StorageError> {
+        let mut state = self.load()?;
+        state.runtime.insert(id.to_string(), runtime);
+        self.save(&state)
+    }
+
+    pub fn delete_bridge_runtime(&self, id: Uuid) -> Result<(), StorageError> {
+        let mut state = self.load()?;
+        state.runtime.remove(&id.to_string());
         self.save(&state)
     }
 

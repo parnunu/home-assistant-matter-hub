@@ -6,7 +6,13 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
-use hamh_core::models::{BridgeConfig, BridgeDevice, BridgeOperation, OperationType};
+use hamh_core::models::{
+    BridgeConfig, BridgeDevice, BridgeFilter, BridgeOperation, BridgeRuntimeEntry,
+    BridgeRuntimeState, FeatureFlags, OperationType, PairingInfo,
+};
+use hamh_ha::HomeAssistantClient;
+use hamh_matter::pairing_info;
+use serde::Deserialize;
 use hamh_ops::OperationQueue;
 use hamh_storage::{FileStorage, StorageError};
 use time::OffsetDateTime;
@@ -16,11 +22,12 @@ use uuid::Uuid;
 pub struct AppState {
     storage: FileStorage,
     ops: OperationQueue,
+    ha: Option<HomeAssistantClient>,
 }
 
-pub fn build_router(storage: FileStorage) -> Router {
+pub fn build_router(storage: FileStorage, ha: Option<HomeAssistantClient>) -> Router {
     let ops = OperationQueue::new(storage.clone());
-    let state = Arc::new(AppState { storage, ops });
+    let state = Arc::new(AppState { storage, ops, ha });
 
     Router::new()
         .route("/api/matter/bridges", get(list_bridges).post(create_bridge))
@@ -45,6 +52,21 @@ pub fn build_router(storage: FileStorage) -> Router {
             post(factory_reset_bridge),
         )
         .route("/api/matter/bridges/:id/devices", get(list_devices))
+        .route(
+            "/api/matter/bridges/:id/devices/:entity_id/actions/on",
+            post(device_on),
+        )
+        .route(
+            "/api/matter/bridges/:id/devices/:entity_id/actions/off",
+            post(device_off),
+        )
+        .route(
+            "/api/matter/bridges/:id/devices/:entity_id/actions/color",
+            post(device_color),
+        )
+        .route("/api/matter/bridges/:id/runtime", get(get_runtime))
+        .route("/api/matter/bridges/runtime", get(list_runtime))
+        .route("/api/matter/bridges/:id/pairing", get(get_pairing))
         .route("/api/matter/operations", get(list_operations))
         .route("/api/matter/health", get(health))
         .with_state(state)
@@ -78,29 +100,40 @@ async fn get_bridge(
 
 async fn create_bridge(
     State(state): State<Arc<AppState>>,
-    Json(mut payload): Json<BridgeConfig>,
+    Json(payload): Json<CreateBridgePayload>,
 ) -> Result<Json<BridgeConfig>, ApiError> {
     let now = OffsetDateTime::now_utc();
-    payload.id = Uuid::new_v4();
-    payload.created_at = now;
-    payload.updated_at = now;
-    state.storage.upsert_bridge(payload.clone())?;
-    let _ = state.ops.enqueue(payload.id, OperationType::Create)?;
-    Ok(Json(payload))
+    let bridge = BridgeConfig {
+        id: Uuid::new_v4(),
+        name: payload.name,
+        port: payload.port,
+        filter: payload.filter.unwrap_or_default(),
+        feature_flags: payload.feature_flags.unwrap_or_default(),
+        created_at: now,
+        updated_at: now,
+    };
+    state.storage.upsert_bridge(bridge.clone())?;
+    let _ = state.ops.enqueue(bridge.id, OperationType::Create)?;
+    Ok(Json(bridge))
 }
 
 async fn update_bridge(
     Path(id): Path<Uuid>,
     State(state): State<Arc<AppState>>,
-    Json(mut payload): Json<BridgeConfig>,
+    Json(payload): Json<UpdateBridgePayload>,
 ) -> Result<Json<BridgeConfig>, ApiError> {
-    if id != payload.id {
-        return Err(ApiError::BadRequest("id mismatch".into()));
-    }
-    payload.updated_at = OffsetDateTime::now_utc();
-    state.storage.upsert_bridge(payload.clone())?;
-    let _ = state.ops.enqueue(payload.id, OperationType::Update)?;
-    Ok(Json(payload))
+    let mut bridge = state
+        .storage
+        .get_bridge(id)?
+        .ok_or(ApiError::NotFound)?;
+    bridge.name = payload.name;
+    bridge.port = payload.port;
+    bridge.filter = payload.filter.unwrap_or_default();
+    bridge.feature_flags = payload.feature_flags.unwrap_or_default();
+    bridge.updated_at = OffsetDateTime::now_utc();
+    state.storage.upsert_bridge(bridge.clone())?;
+    let _ = state.ops.enqueue(bridge.id, OperationType::Update)?;
+    Ok(Json(bridge))
 }
 
 async fn delete_bridge(
@@ -151,11 +184,130 @@ async fn list_devices(
     Ok(Json(devices))
 }
 
+async fn list_runtime(
+    State(state): State<Arc<AppState>>,
+) -> Result<Json<Vec<BridgeRuntimeEntry>>, ApiError> {
+    let runtime = state.storage.list_bridge_runtime()?;
+    Ok(Json(runtime))
+}
+
+async fn get_runtime(
+    Path(id): Path<Uuid>,
+    State(state): State<Arc<AppState>>,
+) -> Result<Json<BridgeRuntimeState>, ApiError> {
+    let runtime = state.storage.get_bridge_runtime(id)?;
+    runtime.map(Json).ok_or(ApiError::NotFound)
+}
+
+#[derive(Debug, Deserialize)]
+struct ColorPayload {
+    rgb: [u8; 3],
+}
+
+async fn device_on(
+    Path((id, entity_id)): Path<(Uuid, String)>,
+    State(state): State<Arc<AppState>>,
+) -> Result<StatusCode, ApiError> {
+    call_device_service(&state, id, &entity_id, "turn_on", None).await?;
+    Ok(StatusCode::ACCEPTED)
+}
+
+async fn device_off(
+    Path((id, entity_id)): Path<(Uuid, String)>,
+    State(state): State<Arc<AppState>>,
+) -> Result<StatusCode, ApiError> {
+    call_device_service(&state, id, &entity_id, "turn_off", None).await?;
+    Ok(StatusCode::ACCEPTED)
+}
+
+async fn device_color(
+    Path((id, entity_id)): Path<(Uuid, String)>,
+    State(state): State<Arc<AppState>>,
+    Json(payload): Json<ColorPayload>,
+) -> Result<StatusCode, ApiError> {
+    call_device_service(
+        &state,
+        id,
+        &entity_id,
+        "turn_on",
+        Some(serde_json::json!({ "rgb_color": payload.rgb })),
+    )
+    .await?;
+    Ok(StatusCode::ACCEPTED)
+}
+
+async fn call_device_service(
+    state: &AppState,
+    bridge_id: Uuid,
+    entity_id: &str,
+    service: &str,
+    extra: Option<serde_json::Value>,
+) -> Result<(), ApiError> {
+    let devices = state.storage.list_bridge_devices(bridge_id)?;
+    if !devices.iter().any(|d| d.entity_id == entity_id) {
+        return Err(ApiError::NotFound);
+    }
+    let ha = state
+        .ha
+        .as_ref()
+        .ok_or_else(|| ApiError::Runtime("home assistant not configured".into()))?;
+    let domain = entity_id
+        .split('.')
+        .next()
+        .ok_or_else(|| ApiError::BadRequest("invalid entity_id".into()))?;
+    let mut payload = serde_json::json!({ "entity_id": entity_id });
+    if let Some(extra) = extra {
+        if let Some(obj) = payload.as_object_mut() {
+            if let Some(extra_obj) = extra.as_object() {
+                for (k, v) in extra_obj {
+                    obj.insert(k.clone(), v.clone());
+                }
+            }
+        }
+    }
+    ha.call_service(domain, service, payload)
+        .await
+        .map_err(|err| ApiError::Runtime(err.to_string()))
+}
+
+async fn get_pairing(
+    Path(id): Path<Uuid>,
+    State(state): State<Arc<AppState>>,
+) -> Result<Json<PairingInfo>, ApiError> {
+    state
+        .storage
+        .get_bridge(id)?
+        .ok_or(ApiError::NotFound)?;
+    let info = pairing_info(id).map_err(|err| ApiError::Runtime(err.to_string()))?;
+    Ok(Json(info))
+}
+
 #[derive(Debug)]
 pub enum ApiError {
     Storage(StorageError),
     NotFound,
     BadRequest(String),
+    Runtime(String),
+}
+
+#[derive(Debug, Deserialize)]
+struct CreateBridgePayload {
+    name: String,
+    port: u16,
+    #[serde(default)]
+    filter: Option<BridgeFilter>,
+    #[serde(default)]
+    feature_flags: Option<FeatureFlags>,
+}
+
+#[derive(Debug, Deserialize)]
+struct UpdateBridgePayload {
+    name: String,
+    port: u16,
+    #[serde(default)]
+    filter: Option<BridgeFilter>,
+    #[serde(default)]
+    feature_flags: Option<FeatureFlags>,
 }
 
 impl From<StorageError> for ApiError {
@@ -172,6 +324,11 @@ impl axum::response::IntoResponse for ApiError {
             ApiError::Storage(err) => (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 format!("storage error: {err}"),
+            )
+                .into_response(),
+            ApiError::Runtime(err) => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("runtime error: {err}"),
             )
                 .into_response(),
         }

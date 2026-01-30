@@ -10,7 +10,14 @@ thiserror = { workspace = true }
 async-trait = { workspace = true }
 uuid = { workspace = true }
 tokio = { workspace = true }
+async-io = "2"
+embassy-sync = "0.7"
+futures = "0.3"
+rs-matter = { git = "https://github.com/project-chip/matter-rs", package = "rs-matter", default-features = false, features = ["std", "rustcrypto", "os", "async-io", "zeroconf"] }
 
 hamh-core = { path = "../hamh-core" }
 
 # Planned: rs-matter for Matter bridge implementation.
+
+[target.'cfg(unix)'.dependencies]
+nix = "0.27"
