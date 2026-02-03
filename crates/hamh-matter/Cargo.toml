@@ -14,6 +14,7 @@ async-io = "2"
 embassy-sync = "0.7"
 futures = "0.3"
 rs-matter = { git = "https://github.com/project-chip/matter-rs", package = "rs-matter", default-features = false, features = ["std", "rustcrypto", "os", "async-io", "zeroconf"] }
+socket2 = "0.6"
 
 hamh-core = { path = "../hamh-core" }
 

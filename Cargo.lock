@@ -1221,6 +1221,7 @@ dependencies = [
  "hamh-core",
  "nix 0.27.1",
  "rs-matter",
+ "socket2",
  "thiserror 2.0.18",
  "tokio",
  "tracing",

@@ -1,6 +1,6 @@
 use std::cell::Cell;
 use std::collections::HashMap;
-use std::net::{SocketAddr, UdpSocket};
+use std::net::{Ipv4Addr, SocketAddr, UdpSocket};
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -804,7 +804,7 @@ async fn run_mdns(matter: &Matter<'_>) -> Result<(), MatterLibError> {
             .next()
             .ok_or_else(|| {
                 tracing::error!("Cannot find network interface suitable for mDNS broadcasting");
-                ErrorCode::StdIoError.into()
+                MatterLibError::from(ErrorCode::StdIoError)
             })?;
 
         tracing::info!("mDNS using interface {iname} with {ip}/{ipv6}");
@@ -814,7 +814,7 @@ async fn run_mdns(matter: &Matter<'_>) -> Result<(), MatterLibError> {
 
     let (ipv4_addr, ipv6_addr, interface) = initialize_network()?;
 
-    let mut socket = Socket::new(Domain::IPV6, Type::DGRAM, Some(Protocol::UDP))?;
+    let socket = Socket::new(Domain::IPV6, Type::DGRAM, Some(Protocol::UDP))?;
     socket.set_reuse_address(true)?;
     socket.set_only_v6(false)?;
     socket.bind(&MDNS_SOCKET_DEFAULT_BIND_ADDR.into())?;

@@ -47,7 +47,7 @@ async fn build_bridge_devices(
         }
         if let Some(device_type) = map_descriptor_to_device_type(&descriptor) {
             devices.push(BridgeDevice {
-                entity_id: descriptor.entity_id,
+                entity_id: descriptor.entity_id.clone(),
                 device_type,
                 endpoint_id: 0,
                 display_name: display_name_from_descriptor(&descriptor),
