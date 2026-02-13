@@ -1,0 +1,45 @@
+name: Publish Add-on Image (Rework)
+
+on:
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: "Image tag to publish"
+        required: true
+        default: "3.0.5-beta.1"
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build-push:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: Rework
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push rework add-on image
+        uses: docker/build-push-action@v6
+        with:
+          push: true
+          context: .
+          file: docker/rework-addon.Dockerfile
+          platforms: linux/amd64,linux/arm/v7,linux/arm64/v8
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/home-assistant-matter-hub-addon:${{ inputs.image_tag }}
+            ghcr.io/${{ github.repository_owner }}/home-assistant-matter-hub-addon:rework
