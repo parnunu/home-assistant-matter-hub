@@ -1,0 +1,57 @@
+name: Publish Add-on Image (main)
+
+on:
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: "Image tag to publish"
+        required: true
+        default: "3.0.4"
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build-push:
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: main
+
+      - name: Setup Environment
+        uses: ./.github/actions/setup-node
+
+      - name: Install Dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm run lint
+
+      - name: Test
+        run: pnpm run test
+
+      - name: Build package.tgz
+        run: pnpm run build
+
+      - name: Setup Docker
+        uses: ./.github/actions/setup-docker
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push add-on image
+        uses: docker/build-push-action@v6
+        with:
+          push: true
+          context: apps/home-assistant-matter-hub
+          file: apps/home-assistant-matter-hub/addon.Dockerfile
+          platforms: linux/amd64,linux/arm/v7,linux/arm64/v8
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/home-assistant-matter-hub-addon:${{ inputs.image_tag }}
+            ghcr.io/${{ github.repository_owner }}/home-assistant-matter-hub-addon:main
