@@ -12,8 +12,8 @@ import {
 } from "../../state/bridges/bridge-actions.ts";
 import {
   selectBridge,
-  selectBridges,
   selectBridgeDeleting,
+  selectBridges,
   selectUsedPorts,
 } from "../../state/bridges/bridge-selectors.ts";
 import { useAppDispatch, useAppSelector } from "../../state/hooks.ts";

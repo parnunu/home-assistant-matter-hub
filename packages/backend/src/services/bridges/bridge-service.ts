@@ -6,10 +6,10 @@ import type {
   UpdateBridgeRequest,
 } from "@home-assistant-matter-hub/common";
 import { Service } from "../../core/ioc/service.js";
+import { appendDebugLog } from "../../utils/logging/file-log.js";
 import type { BridgeStorage } from "../storage/bridge-storage.js";
 import type { Bridge } from "./bridge.js";
 import type { BridgeFactory } from "./bridge-factory.js";
-import { appendDebugLog } from "../../utils/logging/file-log.js";
 
 export interface BridgeServiceProps {
   basicInformation: BridgeBasicInformation;

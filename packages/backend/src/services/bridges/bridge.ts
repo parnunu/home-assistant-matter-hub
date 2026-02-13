@@ -1,19 +1,19 @@
+import fs from "node:fs";
+import path from "node:path";
 import {
   BridgeStatus,
   type UpdateBridgeRequest,
 } from "@home-assistant-matter-hub/common";
 import type { Environment, Logger } from "@matter/general";
 import { StorageService } from "@matter/main";
-import fs from "node:fs";
-import path from "node:path";
 import type { LoggerService } from "../../core/app/logger.js";
 import { BridgeServerNode } from "../../matter/endpoints/bridge-server-node.js";
+import { appendDebugLog } from "../../utils/logging/file-log.js";
 import type {
   BridgeDataProvider,
   BridgeServerStatus,
 } from "./bridge-data-provider.js";
 import type { BridgeEndpointManager } from "./bridge-endpoint-manager.js";
-import { appendDebugLog } from "../../utils/logging/file-log.js";
 
 export class Bridge {
   private readonly env: Environment;
